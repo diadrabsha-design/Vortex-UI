@@ -1,793 +1,1093 @@
 --[[
     ╔═════════════════════════════════════════════════════════════════════════════════════╗
-    ║                 VORTEX UI v3.0 - COMPLETE PRODUCTION LUAU CODE                      ║
-    ║               Designed for Delta Executor 2026, Mobile & Desktop                    ║
-    ║         Zero Errors • Full Touch Support • Zero-Brain Universal API                 ║
+    ║                 VORTEX UI v3.5 - STANDALONE ALL-IN-ONE BEAST EDITION                ║
+    ║       Zero Network Dependency - 100% Offline & Compatible with Delta Mobile 2026    ║
     ╚═════════════════════════════════════════════════════════════════════════════════════╝
 ]]
 
--- [ 1. VORTEX UI CORE ENGINE ] --
-local Vortex = {}
-Vortex.__index = Vortex
-Vortex.Version = "3.0.0"
+local Vortex = (function()
+    local Vortex = {}
+    Vortex.__index = Vortex
+    Vortex.Version = "3.5.0"
+    Vortex.Flags = {}
 
--- حماية استدعاء الخدمات عبر cloneref لتفادي كشف الألعاب
-local function GetService(name)
-    local s = game:GetService(name)
-    if cloneref then
-        local ok, ref = pcall(cloneref, s)
-        if ok and ref then return ref end
-    end
-    return s
-end
-
-local TweenService = GetService("TweenService")
-local UserInputService = GetService("UserInputService")
-local CoreGui = GetService("CoreGui")
-local HttpService = GetService("HttpService")
-local Players = GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
--- محدد الحاوية الآمنة لـ Delta وباقي المحقنات
-local function GetSafeGuiParent()
-    local success, parent = pcall(function()
-        if gethui then
-            return gethui()
-        elseif syn and syn.protect_gui then
-            local f = Instance.new("Folder")
-            syn.protect_gui(f)
-            f.Parent = CoreGui
-            return f
-        elseif CoreGui then
-            return CoreGui
+    local function GetService(name)
+        local s = game:GetService(name)
+        if cloneref then
+            local ok, ref = pcall(cloneref, s)
+            if ok and ref then return ref end
         end
-        return nil
-    end)
-    if success and parent then return parent end
-    return LocalPlayer:WaitForChild("PlayerGui")
-end
+        return s
+    end
 
--- ألوان الثيمات
-Vortex.Themes = {
-    CyberDark = {
-        Background = Color3.fromRGB(13, 16, 24),
-        Header = Color3.fromRGB(19, 24, 36),
-        Sidebar = Color3.fromRGB(16, 20, 30),
-        Card = Color3.fromRGB(24, 30, 46),
-        CardHover = Color3.fromRGB(32, 40, 62),
-        Accent = Color3.fromRGB(0, 240, 255),
-        Text = Color3.fromRGB(240, 245, 255),
-        SubText = Color3.fromRGB(140, 150, 175),
-        Border = Color3.fromRGB(38, 48, 72),
-        ToggleOff = Color3.fromRGB(44, 52, 70)
+    local TweenService = GetService("TweenService")
+    local UserInputService = GetService("UserInputService")
+    local CoreGui = GetService("CoreGui")
+    local Players = GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+
+    local function GetSafeGuiParent()
+        local success, parent = pcall(function()
+            if gethui then return gethui()
+            elseif syn and syn.protect_gui then
+                local f = Instance.new("Folder")
+                syn.protect_gui(f)
+                f.Parent = CoreGui
+                return f
+            elseif CoreGui then return CoreGui end
+            return nil
+        end)
+        if success and parent then return parent end
+        return LocalPlayer:WaitForChild("PlayerGui")
+    end
+
+    Vortex.Themes = {
+        CyberDark = {
+            Background = Color3.fromRGB(13, 16, 24),
+            Header = Color3.fromRGB(19, 24, 36),
+            Sidebar = Color3.fromRGB(16, 20, 30),
+            Card = Color3.fromRGB(24, 30, 46),
+            CardHover = Color3.fromRGB(32, 40, 62),
+            Accent = Color3.fromRGB(0, 240, 255),
+            Text = Color3.fromRGB(240, 245, 255),
+            SubText = Color3.fromRGB(140, 150, 175),
+            Border = Color3.fromRGB(38, 48, 72),
+            Success = Color3.fromRGB(46, 213, 115),
+            ToggleOff = Color3.fromRGB(44, 52, 70)
+        }
     }
-}
 
--- محرك التحريك السلس
-local function FastTween(inst, props, dur)
-    local t = TweenService:Create(inst, TweenInfo.new(dur or 0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
-    t:Play()
-    return t
-end
-
--- نظام إدارة الذاكرة ومنع الكراش (Maid Engine)
-local function CreateMaid()
-    local maid = { _t = {} }
-    function maid:GiveTask(t) table.insert(self._t, t) end
-    function maid:Clean()
-        for _, i in ipairs(self._t) do
-            if typeof(i) == "RBXScriptConnection" then i:Disconnect()
-            elseif typeof(i) == "Instance" then i:Destroy() end
-        end
-        table.clear(self._t)
-    end
-    return maid
-end
-
--- معالج المدخلات الذكي (يقبل الجداول أو المتغيرات المباشرة)
-local function NormalizeArgs(...)
-    local a = {...}
-    if type(a[1]) == "table" and #a == 1 then return a[1] end
-    return a
-end
-
--- [ دالة إنشاء النافذة الرئيسية ] --
-function Vortex:CreateWindow(...)
-    local raw = NormalizeArgs(...)
-    local config = type(raw) == "table" and raw.Name and raw or { Name = raw[1] or "VORTEX HUB", SubTitle = raw[2] or "Delta Mobile 2026" }
-    local Theme = Vortex.Themes[config.Theme] or Vortex.Themes.CyberDark
-
-    local cam = workspace.CurrentCamera
-    local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
-    local winW = math.clamp(vp.X - 30, 340, 560)
-    local winH = math.clamp(vp.Y - 50, 260, 360)
-    local WindowSize = config.Size or UDim2.fromOffset(winW, winH)
-
-    local Maid = CreateMaid()
-
-    -- ScreenGui
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "VORTEX_" .. HttpService:GenerateGUID(false):sub(1, 8)
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    ScreenGui.Parent = GetSafeGuiParent()
-
-    -- التكيف التلقائي مع شاشة الجوال (DPI Scale)
-    local UIScale = Instance.new("UIScale")
-    UIScale.Parent = ScreenGui
-    local function UpdateScale()
-        if cam then
-            local currentVp = cam.ViewportSize
-            if currentVp.X < 650 or currentVp.Y < 450 then
-                UIScale.Scale = math.clamp(currentVp.X / 650, 0.72, 0.85)
-            elseif currentVp.X < 900 then
-                UIScale.Scale = 0.92
-            else
-                UIScale.Scale = 1.0
-            end
-        end
-    end
-    UpdateScale()
-    if cam then
-        Maid:GiveTask(cam:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateScale))
+    local function FastTween(inst, props, dur, style, dir)
+        dur = dur or 0.16
+        style = style or Enum.EasingStyle.Quad
+        dir = dir or Enum.EasingDirection.Out
+        local t = TweenService:Create(inst, TweenInfo.new(dur, style, dir), props)
+        t:Play()
+        return t
     end
 
-    -- الإطار الرئيسي
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainFrame"
-    MainFrame.Size = WindowSize
-    MainFrame.Position = UDim2.new(0.5, -WindowSize.X.Offset / 2, 0.5, -WindowSize.Y.Offset / 2)
-    MainFrame.BackgroundColor3 = Theme.Background
-    MainFrame.BorderSizePixel = 0
-    MainFrame.ClipsDescendants = true
-    MainFrame.Parent = ScreenGui
+    local function SafeCallback(cb, ...)
+        if type(cb) ~= "function" then return true end
+        local args = { ... }
+        local ok, err = pcall(function() cb(unpack(args)) end)
+        if not ok then warn("[VORTEX UI SAFE PCALL ERROR]:", err) end
+        return ok
+    end
 
-    local MainCorner = Instance.new("UICorner")
-    MainCorner.CornerRadius = UDim.new(0, 12)
-    MainCorner.Parent = MainFrame
-
-    local MainStroke = Instance.new("UIStroke")
-    MainStroke.Color = Theme.Border
-    MainStroke.Thickness = 1.2
-    MainStroke.Parent = MainFrame
-
-    -- الشريط العلوي (Header)
-    local Header = Instance.new("Frame")
-    Header.Name = "Header"
-    Header.Size = UDim2.new(1, 0, 0, 48)
-    Header.BackgroundColor3 = Theme.Header
-    Header.BorderSizePixel = 0
-    Header.Parent = MainFrame
-
-    local hCorner = Instance.new("UICorner")
-    hCorner.CornerRadius = UDim.new(0, 12)
-    hCorner.Parent = Header
-
-    local Title = Instance.new("TextLabel")
-    Title.Text = config.Name or "VORTEX HUB"
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 15
-    Title.TextColor3 = Theme.Text
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.BackgroundTransparency = 1
-    Title.Position = UDim2.new(0, 14, 0, 8)
-    Title.Size = UDim2.new(0, 180, 0, 18)
-    Title.Parent = Header
-
-    local SubTitle = Instance.new("TextLabel")
-    SubTitle.Text = (config.SubTitle or "Delta Mobile 2026") .. " • v3.0"
-    SubTitle.Font = Enum.Font.Gotham
-    SubTitle.TextSize = 10
-    SubTitle.TextColor3 = Theme.SubText
-    SubTitle.TextXAlignment = Enum.TextXAlignment.Left
-    SubTitle.BackgroundTransparency = 1
-    SubTitle.Position = UDim2.new(0, 14, 0, 26)
-    SubTitle.Size = UDim2.new(0, 180, 0, 14)
-    SubTitle.Parent = Header
-
-    -- شريط البحث الحي (Live Search)
-    local SearchBox = Instance.new("TextBox")
-    SearchBox.PlaceholderText = "🔍 بحث في الأزرار..."
-    SearchBox.Font = Enum.Font.Gotham
-    SearchBox.TextSize = 11
-    SearchBox.TextColor3 = Theme.Accent
-    SearchBox.PlaceholderColor3 = Theme.SubText
-    SearchBox.BackgroundColor3 = Theme.Card
-    SearchBox.BorderSizePixel = 0
-    SearchBox.Position = UDim2.new(1, -210, 0, 10)
-    SearchBox.Size = UDim2.new(0, 130, 0, 28)
-    SearchBox.ClearTextOnFocus = false
-    SearchBox.Parent = Header
-
-    local sCorner = Instance.new("UICorner")
-    sCorner.CornerRadius = UDim.new(0, 6)
-    sCorner.Parent = SearchBox
-
-    -- أزرار الإغلاق والتصغير
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Text = "✕"
-    CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.TextSize = 12
-    CloseBtn.TextColor3 = Theme.SubText
-    CloseBtn.BackgroundColor3 = Theme.Card
-    CloseBtn.Size = UDim2.new(0, 28, 0, 28)
-    CloseBtn.Position = UDim2.new(1, -36, 0, 10)
-    CloseBtn.BorderSizePixel = 0
-    CloseBtn.Parent = Header
-
-    local cbCorner = Instance.new("UICorner")
-    cbCorner.CornerRadius = UDim.new(0, 6)
-    cbCorner.Parent = CloseBtn
-
-    local MinBtn = Instance.new("TextButton")
-    MinBtn.Text = "─"
-    MinBtn.Font = Enum.Font.GothamBold
-    MinBtn.TextSize = 12
-    MinBtn.TextColor3 = Theme.SubText
-    MinBtn.BackgroundColor3 = Theme.Card
-    MinBtn.Size = UDim2.new(0, 28, 0, 28)
-    MinBtn.Position = UDim2.new(1, -70, 0, 10)
-    MinBtn.BorderSizePixel = 0
-    MinBtn.Parent = Header
-
-    local mbCorner = Instance.new("UICorner")
-    mbCorner.CornerRadius = UDim.new(0, 6)
-    mbCorner.Parent = MinBtn
-
-    -- محرك السحب اللمسي الدقيق للجوال والحاسوب
-    local dragging, dragStart, startPos, dragInput
-    Maid:GiveTask(Header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = MainFrame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
+    local function IsArabicText(str)
+        if type(str) ~= "string" then return false end
+        for i = 1, #str do
+            local byte = string.byte(str, i)
+            if byte and byte >= 216 and byte <= 219 then return true end
         end
-    end))
+        return false
+    end
 
-    Maid:GiveTask(Header.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
+    local function ApplyTextStyle(textLabel, text, size, color, font)
+        textLabel.Text = tostring(text or "")
+        textLabel.TextSize = size or 12
+        textLabel.TextColor3 = color or Vortex.Themes.CyberDark.Text
+        textLabel.Font = font or Enum.Font.GothamMedium
+        textLabel.TextWrapped = true
+        textLabel.BackgroundTransparency = 1
+        textLabel.BorderSizePixel = 0
+        if IsArabicText(text) then
+            textLabel.TextXAlignment = Enum.TextXAlignment.Right
+        else
+            textLabel.TextXAlignment = Enum.TextXAlignment.Left
         end
-    end))
+    end
 
-    Maid:GiveTask(UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end))
-
-    -- الزر العائم للجوال (Mobile Bubble ⚡)
-    local Bubble = Instance.new("TextButton")
-    Bubble.Name = "VortexBubble"
-    Bubble.Size = UDim2.new(0, 48, 0, 48)
-    Bubble.Position = UDim2.new(0.04, 0, 0.25, 0)
-    Bubble.BackgroundColor3 = Theme.Header
-    Bubble.Text = "⚡"
-    Bubble.TextSize = 20
-    Bubble.TextColor3 = Theme.Accent
-    Bubble.Font = Enum.Font.GothamBold
-    Bubble.BorderSizePixel = 0
-    Bubble.Parent = ScreenGui
-
-    local bCorner = Instance.new("UICorner")
-    bCorner.CornerRadius = UDim.new(1, 0)
-    bCorner.Parent = Bubble
-
-    local bStroke = Instance.new("UIStroke")
-    bStroke.Color = Theme.Accent
-    bStroke.Thickness = 1.5
-    bStroke.Parent = Bubble
-
-    -- سحب الزر العائم وتثبيته باللمس
-    local bDragging, bDragStart, bStartPos
-    Maid:GiveTask(Bubble.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            bDragging = true
-            bDragStart = input.Position
-            bStartPos = Bubble.Position
-        end
-    end))
-    Maid:GiveTask(UserInputService.InputChanged:Connect(function(input)
-        if bDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - bDragStart
-            Bubble.Position = UDim2.new(bStartPos.X.Scale, bStartPos.X.Offset + delta.X, bStartPos.Y.Scale, bStartPos.Y.Offset + delta.Y)
-        end
-    end))
-    Maid:GiveTask(UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            bDragging = false
-        end
-    end))
-
-    Maid:GiveTask(Bubble.MouseButton1Click:Connect(function()
-        MainFrame.Visible = not MainFrame.Visible
-        FastTween(Bubble, { Size = UDim2.new(0, 54, 0, 54) }, 0.08)
-        task.wait(0.08)
-        FastTween(Bubble, { Size = UDim2.new(0, 48, 0, 48) }, 0.12)
-    end))
-
-    Maid:GiveTask(CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end))
-    local isMin = false
-    Maid:GiveTask(MinBtn.MouseButton1Click:Connect(function()
-        isMin = not isMin
-        FastTween(MainFrame, { Size = isMin and UDim2.new(WindowSize.X.Scale, WindowSize.X.Offset, 0, 48) or WindowSize }, 0.16)
-    end))
-
-    -- جسم النافذة (Body)
-    local Body = Instance.new("Frame")
-    Body.Size = UDim2.new(1, 0, 1, -48)
-    Body.Position = UDim2.new(0, 0, 0, 48)
-    Body.BackgroundTransparency = 1
-    Body.Parent = MainFrame
-
-    local Sidebar = Instance.new("ScrollingFrame")
-    Sidebar.Size = UDim2.new(0, 140, 1, 0)
-    Sidebar.BackgroundColor3 = Theme.Sidebar
-    Sidebar.BorderSizePixel = 0
-    Sidebar.ScrollBarThickness = 2
-    Sidebar.ScrollBarImageColor3 = Theme.Border
-    Sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
-    Sidebar.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    Sidebar.Parent = Body
-
-    local sLayout = Instance.new("UIListLayout")
-    sLayout.Padding = UDim.new(0, 6)
-    sLayout.Parent = Sidebar
-
-    local sPad = Instance.new("UIPadding")
-    sPad.PaddingTop = UDim.new(0, 8)
-    sPad.PaddingLeft = UDim.new(0, 6)
-    sPad.PaddingRight = UDim.new(0, 6)
-    sPad.Parent = Sidebar
-
-    local ContentArea = Instance.new("Frame")
-    ContentArea.Size = UDim2.new(1, -140, 1, 0)
-    ContentArea.Position = UDim2.new(0, 140, 0, 0)
-    ContentArea.BackgroundTransparency = 1
-    ContentArea.Parent = Body
-
-    local WindowObj = { _tabs = {}, _maid = Maid }
-
-    -- البحث المباشر
-    SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
-        local q = SearchBox.Text:lower():gsub("%s+", "")
-        for _, tab in ipairs(WindowObj._tabs) do
-            for _, item in ipairs(tab._elements) do
-                if item.Frame and item.SearchText then
-                    item.Frame.Visible = (q == "" or item.SearchText:find(q, 1, true) ~= nil)
-                end
-            end
-        end
-    end)
-
-    -- [ دالة إنشاء التبويب ] --
-    local function CreateTabInternal(...)
-        local tArgs = NormalizeArgs(...)
-        local tabName = type(tArgs) == "table" and (tArgs.Name or tArgs[1]) or tostring(tArgs)
-        local icon = type(tArgs) == "table" and (tArgs.Icon or tArgs[2]) or "⚡"
-
-        local TabBtn = Instance.new("TextButton")
-        TabBtn.Size = UDim2.new(1, 0, 0, 36)
-        TabBtn.BackgroundColor3 = Theme.Card
-        TabBtn.BackgroundTransparency = 0.85
-        TabBtn.Text = icon .. "  " .. tabName
-        TabBtn.Font = Enum.Font.GothamMedium
-        TabBtn.TextSize = 12
-        TabBtn.TextColor3 = Theme.SubText
-        TabBtn.BorderSizePixel = 0
-        TabBtn.Parent = Sidebar
-
-        local tbCorner = Instance.new("UICorner")
-        tbCorner.CornerRadius = UDim.new(0, 8)
-        tbCorner.Parent = TabBtn
-
-        local TabContainer = Instance.new("ScrollingFrame")
-        TabContainer.Size = UDim2.new(1, -20, 1, -16)
-        TabContainer.Position = UDim2.new(0, 10, 0, 8)
-        TabContainer.BackgroundTransparency = 1
-        TabContainer.BorderSizePixel = 0
-        TabContainer.ScrollBarThickness = 2
-        TabContainer.ScrollBarImageColor3 = Theme.Border
-        TabContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-        TabContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        TabContainer.Visible = false
-        TabContainer.Parent = ContentArea
-
-        local tcLayout = Instance.new("UIListLayout")
-        tcLayout.Padding = UDim.new(0, 8)
-        tcLayout.Parent = TabContainer
-
-        local TabObj = { _btn = TabBtn, _c = TabContainer, _elements = {} }
-
-        local function Select()
-            for _, t in pairs(WindowObj._tabs) do
-                t._c.Visible = false
-                t._btn.BackgroundTransparency = 0.85
-                t._btn.TextColor3 = Theme.SubText
-            end
-            TabContainer.Visible = true
-            TabBtn.BackgroundTransparency = 0
-            TabBtn.TextColor3 = Theme.Accent
-        end
-
-        Maid:GiveTask(TabBtn.MouseButton1Click:Connect(Select))
-        if #WindowObj._tabs == 0 then Select() end
-        table.insert(WindowObj._tabs, TabObj)
-
-        -- [ 1. زر تفاعلي (Button) ] --
-        local function CreateButton(...)
-            local bArgs = NormalizeArgs(...)
-            local bName = type(bArgs) == "table" and (bArgs.Name or bArgs[1]) or tostring(bArgs)
-            local cb = type(bArgs) == "table" and (bArgs.Callback or bArgs.Func or bArgs[2]) or function() end
-
-            local Btn = Instance.new("TextButton")
-            Btn.Size = UDim2.new(1, 0, 0, 38)
-            Btn.BackgroundColor3 = Theme.Card
-            Btn.BorderSizePixel = 0
-            Btn.Text = "  " .. bName
-            Btn.Font = Enum.Font.GothamSemibold
-            Btn.TextSize = 13
-            Btn.TextColor3 = Theme.Text
-            Btn.TextXAlignment = Enum.TextXAlignment.Left
-            Btn.AutoButtonColor = false
-            Btn.Parent = TabContainer
-
-            local btnCorner = Instance.new("UICorner")
-            btnCorner.CornerRadius = UDim.new(0, 8)
-            btnCorner.Parent = Btn
-
-            local Arrow = Instance.new("TextLabel")
-            Arrow.Text = "➜"
-            Arrow.Font = Enum.Font.GothamBold
-            Arrow.TextSize = 12
-            Arrow.TextColor3 = Theme.SubText
-            Arrow.BackgroundTransparency = 1
-            Arrow.Position = UDim2.new(1, -28, 0.5, -8)
-            Arrow.Size = UDim2.new(0, 16, 0, 16)
-            Arrow.Parent = Btn
-
-            Maid:GiveTask(Btn.MouseButton1Click:Connect(function()
-                FastTween(Btn, { BackgroundColor3 = Theme.CardHover }, 0.08)
-                FastTween(Arrow, { TextColor3 = Theme.Accent }, 0.08)
-                task.spawn(cb)
-                task.wait(0.12)
-                FastTween(Btn, { BackgroundColor3 = Theme.Card }, 0.15)
-                FastTween(Arrow, { TextColor3 = Theme.SubText }, 0.15)
-            end))
-
-            table.insert(TabObj._elements, { Frame = Btn, SearchText = bName:lower() })
-            return Btn
-        end
-
-        -- [ 2. مفتاح تبديل (Toggle) ] --
-        local function CreateToggle(...)
-            local tArgs = NormalizeArgs(...)
-            local tName = type(tArgs) == "table" and (tArgs.Name or tArgs[1]) or tostring(tArgs)
-            local state = type(tArgs) == "table" and (tArgs.CurrentValue or tArgs.Default or tArgs[2]) or false
-            local cb = type(tArgs) == "table" and (tArgs.Callback or tArgs[3]) or function() end
-
-            local TFrame = Instance.new("TextButton")
-            TFrame.Size = UDim2.new(1, 0, 0, 38)
-            TFrame.BackgroundColor3 = Theme.Card
-            TFrame.BorderSizePixel = 0
-            TFrame.Text = ""
-            TFrame.AutoButtonColor = false
-            TFrame.Parent = TabContainer
-
-            local tfCorner = Instance.new("UICorner")
-            tfCorner.CornerRadius = UDim.new(0, 8)
-            tfCorner.Parent = TFrame
-
-            local Lbl = Instance.new("TextLabel")
-            Lbl.Text = tName
-            Lbl.Font = Enum.Font.GothamSemibold
-            Lbl.TextSize = 13
-            Lbl.TextColor3 = Theme.Text
-            Lbl.TextXAlignment = Enum.TextXAlignment.Left
-            Lbl.BackgroundTransparency = 1
-            Lbl.Position = UDim2.new(0, 12, 0, 0)
-            Lbl.Size = UDim2.new(1, -60, 1, 0)
-            Lbl.Parent = TFrame
-
-            local Track = Instance.new("Frame")
-            Track.Size = UDim2.new(0, 36, 0, 18)
-            Track.Position = UDim2.new(1, -48, 0.5, -9)
-            Track.BackgroundColor3 = state and Theme.Accent or Theme.ToggleOff
-            Track.BorderSizePixel = 0
-            Track.Parent = TFrame
-
-            local trCorner = Instance.new("UICorner")
-            trCorner.CornerRadius = UDim.new(1, 0)
-            trCorner.Parent = Track
-
-            local Knob = Instance.new("Frame")
-            Knob.Size = UDim2.new(0, 14, 0, 14)
-            Knob.Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
-            Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            Knob.BorderSizePixel = 0
-            Knob.Parent = Track
-
-            local knCorner = Instance.new("UICorner")
-            knCorner.CornerRadius = UDim.new(1, 0)
-            knCorner.Parent = Knob
-
-            local function Update(ns)
-                state = ns
-                FastTween(Track, { BackgroundColor3 = state and Theme.Accent or Theme.ToggleOff }, 0.15)
-                FastTween(Knob, { Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7) }, 0.15)
-                pcall(cb, state)
-            end
-
-            Maid:GiveTask(TFrame.MouseButton1Click:Connect(function() Update(not state) end))
-            table.insert(TabObj._elements, { Frame = TFrame, SearchText = tName:lower() })
-            return { Set = Update, Get = function() return state end }
-        end
-
-        -- [ 3. شريط تمرير لمسي (Slider) ] --
-        local function CreateSlider(...)
-            local sArgs = NormalizeArgs(...)
-            local sName = type(sArgs) == "table" and (sArgs.Name or sArgs[1]) or tostring(sArgs)
-            local minV = type(sArgs) == "table" and ((sArgs.Range and sArgs.Range[1]) or sArgs.Min or sArgs[2]) or 0
-            local maxV = type(sArgs) == "table" and ((sArgs.Range and sArgs.Range[2]) or sArgs.Max or sArgs[3]) or 100
-            local curV = type(sArgs) == "table" and (sArgs.CurrentValue or sArgs.Default or sArgs[4]) or minV
-            local cb = type(sArgs) == "table" and (sArgs.Callback or sArgs[5]) or function() end
-
-            local SFrame = Instance.new("Frame")
-            SFrame.Size = UDim2.new(1, 0, 0, 50)
-            SFrame.BackgroundColor3 = Theme.Card
-            SFrame.BorderSizePixel = 0
-            SFrame.Parent = TabContainer
-
-            local sfCorner = Instance.new("UICorner")
-            sfCorner.CornerRadius = UDim.new(0, 8)
-            sfCorner.Parent = SFrame
-
-            local Lbl = Instance.new("TextLabel")
-            Lbl.Text = sName
-            Lbl.Font = Enum.Font.GothamSemibold
-            Lbl.TextSize = 13
-            Lbl.TextColor3 = Theme.Text
-            Lbl.TextXAlignment = Enum.TextXAlignment.Left
-            Lbl.BackgroundTransparency = 1
-            Lbl.Position = UDim2.new(0, 12, 0, 6)
-            Lbl.Size = UDim2.new(0.6, 0, 0, 16)
-            Lbl.Parent = SFrame
-
-            local ValLbl = Instance.new("TextLabel")
-            ValLbl.Text = tostring(curV)
-            ValLbl.Font = Enum.Font.GothamMedium
-            ValLbl.TextSize = 12
-            ValLbl.TextColor3 = Theme.Accent
-            ValLbl.TextXAlignment = Enum.TextXAlignment.Right
-            ValLbl.BackgroundTransparency = 1
-            ValLbl.Position = UDim2.new(0.6, 0, 0, 6)
-            ValLbl.Size = UDim2.new(0.4, -12, 0, 16)
-            ValLbl.Parent = SFrame
-
-            local Bar = Instance.new("Frame")
-            Bar.Size = UDim2.new(1, -24, 0, 6)
-            Bar.Position = UDim2.new(0, 12, 0, 32)
-            Bar.BackgroundColor3 = Theme.ToggleOff
-            Bar.BorderSizePixel = 0
-            Bar.Parent = SFrame
-
-            local bCorner = Instance.new("UICorner")
-            bCorner.CornerRadius = UDim.new(1, 0)
-            bCorner.Parent = Bar
-
-            local Fill = Instance.new("Frame")
-            Fill.Size = UDim2.new((curV - minV) / (maxV - minV), 0, 1, 0)
-            Fill.BackgroundColor3 = Theme.Accent
-            Fill.BorderSizePixel = 0
-            Fill.Parent = Bar
-
-            local fCorner = Instance.new("UICorner")
-            fCorner.CornerRadius = UDim.new(1, 0)
-            fCorner.Parent = Fill
-
-            local sliding = false
-            local function Update(inputX)
-                local absP = Bar.AbsolutePosition.X
-                local absS = Bar.AbsoluteSize.X
-                local r = math.clamp((inputX - absP) / absS, 0, 1)
-                curV = math.floor(minV + (r * (maxV - minV)))
-                Fill.Size = UDim2.new((curV - minV) / (maxV - minV), 0, 1, 0)
-                ValLbl.Text = tostring(curV)
-                pcall(cb, curV)
-            end
-
-            Maid:GiveTask(SFrame.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-                    sliding = true; Update(i.Position.X)
-                end
-            end))
-            Maid:GiveTask(UserInputService.InputChanged:Connect(function(i)
-                if sliding and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-                    Update(i.Position.X)
-                end
-            end))
-            Maid:GiveTask(UserInputService.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then sliding = false end
-            end))
-
-            table.insert(TabObj._elements, { Frame = SFrame, SearchText = sName:lower() })
-            return { Set = function(v) curV = v; Fill.Size = UDim2.new((curV - minV) / (maxV - minV), 0, 1, 0); ValLbl.Text = tostring(curV); pcall(cb, curV) end }
-        end
-
-        -- [ 4. قائمة منسدلة (Dropdown) ] --
-        local function CreateDropdown(...)
-            local dArgs = NormalizeArgs(...)
-            local dName = type(dArgs) == "table" and (dArgs.Name or dArgs[1]) or tostring(dArgs)
-            local opts = type(dArgs) == "table" and (dArgs.Options or dArgs[2]) or {}
-            local cb = type(dArgs) == "table" and (dArgs.Callback or dArgs[3]) or function() end
-            local cur = opts[1] or "اختر..."
-
-            local DFrame = Instance.new("Frame")
-            DFrame.Size = UDim2.new(1, 0, 0, 40)
-            DFrame.BackgroundColor3 = Theme.Card
-            DFrame.BorderSizePixel = 0
-            DFrame.ClipsDescendants = true
-            DFrame.Parent = TabContainer
-
-            local dfCorner = Instance.new("UICorner")
-            dfCorner.CornerRadius = UDim.new(0, 8)
-            dfCorner.Parent = DFrame
-
-            local TBtn = Instance.new("TextButton")
-            TBtn.Size = UDim2.new(1, 0, 0, 40)
-            TBtn.BackgroundTransparency = 1
-            TBtn.Text = "  " .. dName .. "  ➜  " .. cur
-            TBtn.TextColor3 = Theme.Accent
-            TBtn.Font = Enum.Font.GothamSemibold
-            TBtn.TextSize = 12
-            TBtn.TextXAlignment = Enum.TextXAlignment.Left
-            TBtn.Parent = DFrame
-
-            local open = false
-            Maid:GiveTask(TBtn.MouseButton1Click:Connect(function()
-                open = not open
-                FastTween(DFrame, { Size = UDim2.new(1, 0, 0, open and (42 + (#opts * 28)) or 40) }, 0.16)
-            end))
-
-            for idx, o in ipairs(opts) do
-                local OptBtn = Instance.new("TextButton")
-                OptBtn.Size = UDim2.new(1, -16, 0, 24)
-                OptBtn.Position = UDim2.new(0, 8, 0, 40 + ((idx - 1) * 26))
-                OptBtn.BackgroundColor3 = Theme.Header
-                OptBtn.Text = o
-                OptBtn.TextColor3 = Theme.Text
-                OptBtn.Font = Enum.Font.Gotham
-                OptBtn.TextSize = 11
-                OptBtn.BorderSizePixel = 0
-                OptBtn.Parent = DFrame
-
-                local opCorner = Instance.new("UICorner")
-                opCorner.CornerRadius = UDim.new(0, 4)
-                opCorner.Parent = OptBtn
-
-                OptBtn.MouseButton1Click:Connect(function()
-                    cur = o
-                    TBtn.Text = "  " .. dName .. "  ➜  " .. cur
-                    open = false
-                    FastTween(DFrame, { Size = UDim2.new(1, 0, 0, 40) }, 0.16)
-                    pcall(cb, cur)
+    local function MakeDraggable(dragPart, mainFrame)
+        local dragging, dragInput, dragStart, startPos
+        dragPart.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = mainFrame.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then dragging = false end
                 end)
             end
-
-            table.insert(TabObj._elements, { Frame = DFrame, SearchText = dName:lower() })
-            return DFrame
-        end
-
-        -- دعم جميع المسميات بدون الحاجة لتعلمها (Zero-Brain API)
-        TabObj.Button = CreateButton; TabObj.CreateButton = CreateButton; TabObj.AddButton = CreateButton
-        TabObj.Toggle = CreateToggle; TabObj.CreateToggle = CreateToggle; TabObj.AddToggle = CreateToggle
-        TabObj.Slider = CreateSlider; TabObj.CreateSlider = CreateSlider; TabObj.AddSlider = CreateSlider
-        TabObj.Dropdown = CreateDropdown; TabObj.CreateDropdown = CreateDropdown; TabObj.AddDropdown = CreateDropdown
-        TabObj.Section = function(...)
-            local a = NormalizeArgs(...)
-            local t = type(a) == "table" and (a.Name or a[1]) or tostring(a)
-            local l = Instance.new("TextLabel")
-            l.Text = string.upper(t)
-            l.Font = Enum.Font.GothamBold
-            l.TextSize = 11
-            l.TextColor3 = Theme.Accent
-            l.BackgroundTransparency = 1
-            l.Size = UDim2.new(1, 0, 0, 20)
-            l.TextXAlignment = Enum.TextXAlignment.Left
-            l.Parent = TabContainer
-        end
-        TabObj.CreateSection = TabObj.Section; TabObj.AddSection = TabObj.Section
-
-        return TabObj
+        end)
+        dragPart.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                local delta = input.Position - dragStart
+                local cam = workspace.CurrentCamera
+                local viewX = cam and cam.ViewportSize.X or 1920
+                local viewY = cam and cam.ViewportSize.Y or 1080
+                local newX = math.clamp(startPos.X.Offset + delta.X, 10, viewX - mainFrame.AbsoluteSize.X - 10)
+                local newY = math.clamp(startPos.Y.Offset + delta.Y, 10, viewY - mainFrame.AbsoluteSize.Y - 10)
+                mainFrame.Position = UDim2.new(0, newX, 0, newY)
+            end
+        end)
     end
 
-    WindowObj.CreateTab = CreateTabInternal
-    WindowObj.AddTab = CreateTabInternal
-    WindowObj.Tab = CreateTabInternal
-    WindowObj.MakeTab = CreateTabInternal
+    function Vortex:CreateWindow(cfg)
+        cfg = cfg or {}
+        local winName = cfg.Name or "VORTEX BEAST"
+        local winSub = cfg.SubTitle or "Delta Mobile 2026"
+        local theme = Vortex.Themes.CyberDark
 
-    function WindowObj:Destroy()
-        Maid:Clean()
-        ScreenGui:Destroy()
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = "VORTEX_BEAST_GUI_" .. tostring(math.random(1000, 9999))
+        ScreenGui.ResetOnSpawn = false
+        ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        ScreenGui.Parent = GetSafeGuiParent()
+
+        local RootScaler = Instance.new("UIScale")
+        RootScaler.Name = "AutoScaler"
+        RootScaler.Parent = ScreenGui
+
+        local function UpdateDpiScale()
+            local cam = workspace.CurrentCamera
+            if cam then
+                local w = cam.ViewportSize.X
+                if w < 650 then RootScaler.Scale = math.clamp(w / 640, 0.65, 0.95)
+                elseif w < 1000 then RootScaler.Scale = 0.95
+                else RootScaler.Scale = 1 end
+            end
+        end
+        UpdateDpiScale()
+        workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateDpiScale)
+
+        local Main = Instance.new("Frame")
+        Main.Name = "MainFrame"
+        Main.Size = UDim2.new(0, 560, 0, 350)
+        Main.Position = UDim2.new(0.5, -280, 0.5, -175)
+        Main.BackgroundColor3 = theme.Background
+        Main.BorderSizePixel = 0
+        Main.ClipsDescendants = true
+        Main.Parent = ScreenGui
+
+        local mCorner = Instance.new("UICorner")
+        mCorner.CornerRadius = UDim.new(0, 10)
+        mCorner.Parent = Main
+
+        local mStroke = Instance.new("UIStroke")
+        mStroke.Color = theme.Border
+        mStroke.Thickness = 1.2
+        mStroke.Parent = Main
+
+        -- Header
+        local Header = Instance.new("Frame")
+        Header.Name = "Header"
+        Header.Size = UDim2.new(1, 0, 0, 44)
+        Header.BackgroundColor3 = theme.Header
+        Header.BorderSizePixel = 0
+        Header.Parent = Main
+
+        local hCorner = Instance.new("UICorner")
+        hCorner.CornerRadius = UDim.new(0, 10)
+        hCorner.Parent = Header
+
+        local Title = Instance.new("TextLabel")
+        ApplyTextStyle(Title, winName, 14, theme.Text, Enum.Font.GothamBold)
+        Title.Position = UDim2.new(0, 14, 0, 6)
+        Title.Size = UDim2.new(0, 160, 0, 18)
+        Title.Parent = Header
+
+        local Sub = Instance.new("TextLabel")
+        ApplyTextStyle(Sub, winSub, 10, theme.Accent, Enum.Font.Gotham)
+        Sub.Position = UDim2.new(0, 14, 0, 24)
+        Sub.Size = UDim2.new(0, 160, 0, 14)
+        Sub.Parent = Header
+
+        -- Search Bar (Feature 10)
+        local SearchBox = Instance.new("TextBox")
+        SearchBox.Name = "GlobalSearch"
+        SearchBox.Size = UDim2.new(0, 170, 0, 26)
+        SearchBox.Position = UDim2.new(1, -225, 0, 9)
+        SearchBox.BackgroundColor3 = theme.Card
+        SearchBox.PlaceholderText = "🔍 بحث فوري (Search)..."
+        SearchBox.PlaceholderColor3 = theme.SubText
+        ApplyTextStyle(SearchBox, "", 11, theme.Text, Enum.Font.Gotham)
+        SearchBox.ClearTextOnFocus = false
+        SearchBox.Parent = Header
+
+        local sCorner = Instance.new("UICorner")
+        sCorner.CornerRadius = UDim.new(0, 6)
+        sCorner.Parent = SearchBox
+
+        local CloseBtn = Instance.new("TextButton")
+        CloseBtn.Size = UDim2.new(0, 28, 0, 28)
+        CloseBtn.Position = UDim2.new(1, -38, 0, 8)
+        CloseBtn.BackgroundColor3 = theme.Card
+        ApplyTextStyle(CloseBtn, "✕", 12, theme.SubText, Enum.Font.GothamBold)
+        CloseBtn.Parent = Header
+
+        local cCorner = Instance.new("UICorner")
+        cCorner.CornerRadius = UDim.new(0, 6)
+        cCorner.Parent = CloseBtn
+
+        -- Sidebar & Pages Container
+        local Sidebar = Instance.new("ScrollingFrame")
+        Sidebar.Size = UDim2.new(0, 125, 1, -50)
+        Sidebar.Position = UDim2.new(0, 6, 0, 48)
+        Sidebar.BackgroundColor3 = theme.Sidebar
+        Sidebar.ScrollBarThickness = 2
+        Sidebar.BorderSizePixel = 0
+        Sidebar.Parent = Main
+
+        local sbCorner = Instance.new("UICorner")
+        sbCorner.CornerRadius = UDim.new(0, 8)
+        sbCorner.Parent = Sidebar
+
+        local sbLayout = Instance.new("UIListLayout")
+        sbLayout.Padding = UDim.new(0, 4)
+        sbLayout.Parent = Sidebar
+
+        local Content = Instance.new("Frame")
+        Content.Size = UDim2.new(1, -145, 1, -50)
+        Content.Position = UDim2.new(0, 137, 0, 48)
+        Content.BackgroundTransparency = 1
+        Content.Parent = Main
+
+        MakeDraggable(Header, Main)
+
+        -- Mobile Floating Toggle Bubble (Feature 5)
+        local Bubble = Instance.new("ImageButton")
+        Bubble.Name = "VortexMobileBubble"
+        Bubble.Size = UDim2.new(0, 46, 0, 46)
+        Bubble.Position = UDim2.new(0, 20, 0.4, 0)
+        Bubble.BackgroundColor3 = theme.Header
+        Bubble.BorderSizePixel = 0
+        Bubble.Parent = ScreenGui
+
+        local bCorner = Instance.new("UICorner")
+        bCorner.CornerRadius = UDim.new(1, 0)
+        bCorner.Parent = Bubble
+
+        local bStroke = Instance.new("UIStroke")
+        bStroke.Color = theme.Accent
+        bStroke.Thickness = 2
+        bStroke.Parent = Bubble
+
+        local bLabel = Instance.new("TextLabel")
+        ApplyTextStyle(bLabel, "⚡", 18, theme.Accent, Enum.Font.GothamBold)
+        bLabel.Size = UDim2.new(1, 0, 1, 0)
+        bLabel.TextXAlignment = Enum.TextXAlignment.Center
+        bLabel.Parent = Bubble
+
+        MakeDraggable(Bubble, Bubble)
+
+        local isGuiVisible = true
+        local function ToggleGui()
+            isGuiVisible = not isGuiVisible
+            Main.Visible = isGuiVisible
+        end
+        Bubble.MouseButton1Click:Connect(ToggleGui)
+        CloseBtn.MouseButton1Click:Connect(ToggleGui)
+
+        local WindowObj = { Tabs = {}, CurrentTab = nil, RegisteredElements = {} }
+
+        -- Search functionality implementation (Feature 10)
+        SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+            local query = string.lower(SearchBox.Text)
+            for _, item in ipairs(WindowObj.RegisteredElements) do
+                if item.Frame and item.SearchText then
+                    if query == "" or string.find(string.lower(item.SearchText), query, 1, true) then
+                        item.Frame.Visible = true
+                    else
+                        item.Frame.Visible = false
+                    end
+                end
+            end
+        end)
+
+        function WindowObj:CreateTab(tName, tIcon)
+            tIcon = tIcon or "•"
+            local TabBtn = Instance.new("TextButton")
+            TabBtn.Size = UDim2.new(1, -6, 0, 32)
+            TabBtn.BackgroundColor3 = theme.Card
+            TabBtn.BorderSizePixel = 0
+            ApplyTextStyle(TabBtn, " " .. tIcon .. "  " .. tName, 11, theme.SubText, Enum.Font.GothamMedium)
+            TabBtn.Parent = Sidebar
+
+            local tbCorner = Instance.new("UICorner")
+            tbCorner.CornerRadius = UDim.new(0, 6)
+            tbCorner.Parent = TabBtn
+
+            local Page = Instance.new("ScrollingFrame")
+            Page.Size = UDim2.new(1, 0, 1, 0)
+            Page.BackgroundTransparency = 1
+            Page.ScrollBarThickness = 3
+            Page.Visible = false
+            Page.Parent = Content
+
+            local pLayout = Instance.new("UIListLayout")
+            pLayout.Padding = UDim.new(0, 6)
+            pLayout.Parent = Page
+
+            pLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                Page.CanvasSize = UDim2.new(0, 0, 0, pLayout.AbsoluteContentSize.Y + 20)
+            end)
+
+            local function ActivateTab()
+                for _, other in ipairs(WindowObj.Tabs) do
+                    other.Page.Visible = false
+                    FastTween(other.Btn, { BackgroundColor3 = theme.Card, TextColor3 = theme.SubText }, 0.15)
+                end
+                Page.Visible = true
+                WindowObj.CurrentTab = Page
+                FastTween(TabBtn, { BackgroundColor3 = theme.CardHover, TextColor3 = theme.Accent }, 0.15)
+            end
+
+            TabBtn.MouseButton1Click:Connect(ActivateTab)
+            if #WindowObj.Tabs == 0 then ActivateTab() end
+
+            local TabObj = { Btn = TabBtn, Page = Page }
+            table.insert(WindowObj.Tabs, TabObj)
+
+            -- SECTION
+            function TabObj:CreateSection(secName)
+                local SecLabel = Instance.new("TextLabel")
+                SecLabel.Size = UDim2.new(1, 0, 0, 22)
+                ApplyTextStyle(SecLabel, "  " .. secName, 10, theme.Accent, Enum.Font.GothamBold)
+                SecLabel.Parent = Page
+            end
+
+            -- BUTTON
+            function TabObj:CreateButton(opt)
+                opt = opt or {}
+                local bName = opt.Name or opt.Title or opt[1] or "Button"
+                local cb = opt.Callback or opt[2]
+
+                local Btn = Instance.new("TextButton")
+                Btn.Size = UDim2.new(1, -6, 0, 34)
+                Btn.BackgroundColor3 = theme.Card
+                Btn.BorderSizePixel = 0
+                ApplyTextStyle(Btn, "  " .. bName, 12, theme.Text, Enum.Font.GothamMedium)
+                Btn.Parent = Page
+
+                local bCorner = Instance.new("UICorner")
+                bCorner.CornerRadius = UDim.new(0, 6)
+                bCorner.Parent = Btn
+
+                Btn.MouseButton1Click:Connect(function()
+                    FastTween(Btn, { BackgroundColor3 = theme.Accent }, 0.1)
+                    task.wait(0.1)
+                    FastTween(Btn, { BackgroundColor3 = theme.Card }, 0.15)
+                    SafeCallback(cb)
+                end)
+
+                table.insert(WindowObj.RegisteredElements, { Frame = Btn, SearchText = bName })
+                return Btn
+            end
+            TabObj.AddButton = TabObj.CreateButton
+
+            -- TOGGLE (Feature 6: Flags)
+            function TabObj:CreateToggle(opt)
+                opt = opt or {}
+                local tName = opt.Name or opt[1] or "Toggle"
+                local curVal = opt.CurrentValue or opt.Default or false
+                local flag = opt.Flag or tName
+                local cb = opt.Callback or opt[2]
+
+                Vortex.Flags[flag] = curVal
+
+                local Card = Instance.new("Frame")
+                Card.Size = UDim2.new(1, -6, 0, 36)
+                Card.BackgroundColor3 = theme.Card
+                Card.BorderSizePixel = 0
+                Card.Parent = Page
+
+                local cCorner = Instance.new("UICorner")
+                cCorner.CornerRadius = UDim.new(0, 6)
+                cCorner.Parent = Card
+
+                local Label = Instance.new("TextLabel")
+                ApplyTextStyle(Label, "  " .. tName, 12, theme.Text, Enum.Font.GothamMedium)
+                Label.Size = UDim2.new(1, -60, 1, 0)
+                Label.Parent = Card
+
+                local Switch = Instance.new("TextButton")
+                Switch.Size = UDim2.new(0, 44, 0, 22)
+                Switch.Position = UDim2.new(1, -50, 0.5, -11)
+                Switch.BackgroundColor3 = curVal and theme.Accent or theme.ToggleOff
+                Switch.BorderSizePixel = 0
+                Switch.Text = ""
+                Switch.Parent = Card
+
+                local swCorner = Instance.new("UICorner")
+                swCorner.CornerRadius = UDim.new(1, 0)
+                swCorner.Parent = Switch
+
+                local Circle = Instance.new("Frame")
+                Circle.Size = UDim2.new(0, 18, 0, 18)
+                Circle.Position = curVal and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+                Circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                Circle.BorderSizePixel = 0
+                Circle.Parent = Switch
+
+                local cirCorner = Instance.new("UICorner")
+                cirCorner.CornerRadius = UDim.new(1, 0)
+                cirCorner.Parent = Circle
+
+                local function SetState(val)
+                    curVal = val
+                    Vortex.Flags[flag] = val
+                    FastTween(Switch, { BackgroundColor3 = val and theme.Accent or theme.ToggleOff }, 0.15)
+                    FastTween(Circle, { Position = val and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9) }, 0.15)
+                    SafeCallback(cb, val)
+                end
+
+                Switch.MouseButton1Click:Connect(function() SetState(not curVal) end)
+                table.insert(WindowObj.RegisteredElements, { Frame = Card, SearchText = tName })
+
+                return { Set = SetState, Get = function() return curVal end }
+            end
+            TabObj.AddToggle = TabObj.CreateToggle
+
+            -- TEXT / NUMBER INPUT (Feature 2)
+            function TabObj:CreateInput(opt)
+                opt = opt or {}
+                local iName = opt.Name or opt[1] or "Input Box"
+                local placeholder = opt.PlaceholderText or "اكتب هنا..."
+                local flag = opt.Flag or iName
+                local cb = opt.Callback or opt[2]
+
+                local Card = Instance.new("Frame")
+                Card.Size = UDim2.new(1, -6, 0, 38)
+                Card.BackgroundColor3 = theme.Card
+                Card.BorderSizePixel = 0
+                Card.Parent = Page
+
+                local cCorner = Instance.new("UICorner")
+                cCorner.CornerRadius = UDim.new(0, 6)
+                cCorner.Parent = Card
+
+                local Label = Instance.new("TextLabel")
+                ApplyTextStyle(Label, "  " .. iName, 12, theme.Text, Enum.Font.GothamMedium)
+                Label.Size = UDim2.new(0.55, 0, 1, 0)
+                Label.Parent = Card
+
+                local Box = Instance.new("TextBox")
+                Box.Size = UDim2.new(0.42, 0, 0, 26)
+                Box.Position = UDim2.new(0.56, 0, 0.5, -13)
+                Box.BackgroundColor3 = theme.Header
+                Box.PlaceholderText = placeholder
+                Box.PlaceholderColor3 = theme.SubText
+                Box.ClearTextOnFocus = false
+                ApplyTextStyle(Box, "", 11, theme.Accent, Enum.Font.Gotham)
+                Box.Parent = Card
+
+                local bCorner = Instance.new("UICorner")
+                bCorner.CornerRadius = UDim.new(0, 6)
+                bCorner.Parent = Box
+
+                local bStroke = Instance.new("UIStroke")
+                bStroke.Color = theme.Border
+                bStroke.Thickness = 1
+                bStroke.Parent = Box
+
+                Box.FocusLost:Connect(function(enterPressed)
+                    Vortex.Flags[flag] = Box.Text
+                    SafeCallback(cb, Box.Text, enterPressed)
+                end)
+
+                table.insert(WindowObj.RegisteredElements, { Frame = Card, SearchText = iName })
+
+                return {
+                    Set = function(_, txt) Box.Text = tostring(txt) end,
+                    Get = function() return Box.Text end
+                }
+            end
+            TabObj.CreateTextBox = TabObj.CreateInput
+            TabObj.AddInput = TabObj.CreateInput
+
+            -- SLIDER
+            function TabObj:CreateSlider(opt)
+                opt = opt or {}
+                local sName = opt.Name or opt[1] or "Slider"
+                local min = (opt.Range and opt.Range[1]) or opt.Min or 0
+                local max = (opt.Range and opt.Range[2]) or opt.Max or 100
+                local curVal = opt.CurrentValue or opt.Default or min
+                local flag = opt.Flag or sName
+                local cb = opt.Callback or opt[2]
+
+                Vortex.Flags[flag] = curVal
+
+                local Card = Instance.new("Frame")
+                Card.Size = UDim2.new(1, -6, 0, 46)
+                Card.BackgroundColor3 = theme.Card
+                Card.BorderSizePixel = 0
+                Card.Parent = Page
+
+                local cCorner = Instance.new("UICorner")
+                cCorner.CornerRadius = UDim.new(0, 6)
+                cCorner.Parent = Card
+
+                local Label = Instance.new("TextLabel")
+                ApplyTextStyle(Label, "  " .. sName, 12, theme.Text, Enum.Font.GothamMedium)
+                Label.Size = UDim2.new(0.7, 0, 0, 20)
+                Label.Position = UDim2.new(0, 0, 0, 4)
+                Label.Parent = Card
+
+                local ValLabel = Instance.new("TextLabel")
+                ApplyTextStyle(ValLabel, tostring(curVal), 11, theme.Accent, Enum.Font.GothamBold)
+                ValLabel.Size = UDim2.new(0.28, 0, 0, 20)
+                ValLabel.Position = UDim2.new(0.7, 0, 0, 4)
+                ValLabel.TextXAlignment = Enum.TextXAlignment.Right
+                ValLabel.Parent = Card
+
+                local Bar = Instance.new("TextButton")
+                Bar.Size = UDim2.new(1, -16, 0, 8)
+                Bar.Position = UDim2.new(0, 8, 0, 28)
+                Bar.BackgroundColor3 = theme.Header
+                Bar.BorderSizePixel = 0
+                Bar.Text = ""
+                Bar.Parent = Card
+
+                local barCorner = Instance.new("UICorner")
+                barCorner.CornerRadius = UDim.new(1, 0)
+                barCorner.Parent = Bar
+
+                local Fill = Instance.new("Frame")
+                local pct = math.clamp((curVal - min) / (max - min), 0, 1)
+                Fill.Size = UDim2.new(pct, 0, 1, 0)
+                Fill.BackgroundColor3 = theme.Accent
+                Fill.BorderSizePixel = 0
+                Fill.Parent = Bar
+
+                local fCorner = Instance.new("UICorner")
+                fCorner.CornerRadius = UDim.new(1, 0)
+                fCorner.Parent = Fill
+
+                local function UpdateSlider(input)
+                    local barPos = Bar.AbsolutePosition.X
+                    local barSize = Bar.AbsoluteSize.X
+                    local relX = math.clamp((input.Position.X - barPos) / barSize, 0, 1)
+                    local value = math.floor(min + ((max - min) * relX))
+                    curVal = value
+                    Vortex.Flags[flag] = value
+                    Fill.Size = UDim2.new(relX, 0, 1, 0)
+                    ValLabel.Text = tostring(value)
+                    SafeCallback(cb, value)
+                end
+
+                local sliding = false
+                Bar.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        sliding = true
+                        UpdateSlider(input)
+                    end
+                end)
+                UserInputService.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        sliding = false
+                    end
+                end)
+                UserInputService.InputChanged:Connect(function(input)
+                    if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                        UpdateSlider(input)
+                    end
+                end)
+
+                table.insert(WindowObj.RegisteredElements, { Frame = Card, SearchText = sName })
+                return { Set = function(_, v) curVal = v end }
+            end
+            TabObj.AddSlider = TabObj.CreateSlider
+
+            -- DROPDOWN (Feature 4)
+            function TabObj:CreateDropdown(opt)
+                opt = opt or {}
+                local dName = opt.Name or opt[1] or "Dropdown"
+                local options = opt.Options or {"Option 1", "Option 2"}
+                local selected = opt.CurrentOption or options[1] or ""
+                local flag = opt.Flag or dName
+                local cb = opt.Callback or opt[2]
+
+                Vortex.Flags[flag] = selected
+
+                local DropFrame = Instance.new("Frame")
+                DropFrame.Size = UDim2.new(1, -6, 0, 36)
+                DropFrame.BackgroundColor3 = theme.Card
+                DropFrame.BorderSizePixel = 0
+                DropFrame.ClipsDescendants = true
+                DropFrame.Parent = Page
+
+                local dfCorner = Instance.new("UICorner")
+                dfCorner.CornerRadius = UDim.new(0, 6)
+                dfCorner.Parent = DropFrame
+
+                local MainBtn = Instance.new("TextButton")
+                MainBtn.Size = UDim2.new(1, 0, 0, 36)
+                MainBtn.BackgroundTransparency = 1
+                ApplyTextStyle(MainBtn, "  " .. dName .. "  :  " .. tostring(selected), 12, theme.Text, Enum.Font.GothamMedium)
+                MainBtn.Parent = DropFrame
+
+                local Arrow = Instance.new("TextLabel")
+                ApplyTextStyle(Arrow, "▼", 11, theme.Accent, Enum.Font.Gotham)
+                Arrow.Size = UDim2.new(0, 24, 0, 36)
+                Arrow.Position = UDim2.new(1, -26, 0, 0)
+                Arrow.Parent = DropFrame
+
+                local List = Instance.new("Frame")
+                List.Size = UDim2.new(1, -12, 0, #options * 28)
+                List.Position = UDim2.new(0, 6, 0, 38)
+                List.BackgroundTransparency = 1
+                List.Parent = DropFrame
+
+                local lLayout = Instance.new("UIListLayout")
+                lLayout.Padding = UDim.new(0, 2)
+                lLayout.Parent = List
+
+                local isOpen = false
+                local function PopulateOptions(newOpts)
+                    for _, child in ipairs(List:GetChildren()) do
+                        if child:IsA("TextButton") then child:Destroy() end
+                    end
+                    for _, optName in ipairs(newOpts) do
+                        local OptBtn = Instance.new("TextButton")
+                        OptBtn.Size = UDim2.new(1, 0, 0, 26)
+                        OptBtn.BackgroundColor3 = theme.Header
+                        ApplyTextStyle(OptBtn, "   " .. tostring(optName), 11, theme.SubText, Enum.Font.Gotham)
+                        OptBtn.Parent = List
+
+                        local oCorner = Instance.new("UICorner")
+                        oCorner.CornerRadius = UDim.new(0, 4)
+                        oCorner.Parent = OptBtn
+
+                        OptBtn.MouseButton1Click:Connect(function()
+                            selected = optName
+                            Vortex.Flags[flag] = optName
+                            MainBtn.Text = "  " .. dName .. "  :  " .. tostring(optName)
+                            isOpen = false
+                            Arrow.Text = "▼"
+                            FastTween(DropFrame, { Size = UDim2.new(1, -6, 0, 36) }, 0.15)
+                            SafeCallback(cb, optName)
+                        end)
+                    end
+                end
+                PopulateOptions(options)
+
+                MainBtn.MouseButton1Click:Connect(function()
+                    isOpen = not isOpen
+                    Arrow.Text = isOpen and "▲" or "▼"
+                    local targetH = isOpen and (42 + (#options * 28)) or 36
+                    FastTween(DropFrame, { Size = UDim2.new(1, -6, 0, targetH) }, 0.2)
+                end)
+
+                table.insert(WindowObj.RegisteredElements, { Frame = DropFrame, SearchText = dName })
+
+                return {
+                    Refresh = function(_, newOpts)
+                        options = newOpts or {}
+                        PopulateOptions(options)
+                    end,
+                    Set = function(_, val)
+                        selected = val
+                        Vortex.Flags[flag] = val
+                        MainBtn.Text = "  " .. dName .. "  :  " .. tostring(val)
+                    end
+                }
+            end
+            TabObj.AddDropdown = TabObj.CreateDropdown
+
+            -- KEYBIND (Feature 8)
+            function TabObj:CreateKeybind(opt)
+                opt = opt or {}
+                local kName = opt.Name or opt[1] or "Keybind"
+                local curKey = opt.Default or opt.CurrentKeybind or "E"
+                local flag = opt.Flag or kName
+                local cb = opt.Callback or opt[2]
+
+                local Card = Instance.new("Frame")
+                Card.Size = UDim2.new(1, -6, 0, 36)
+                Card.BackgroundColor3 = theme.Card
+                Card.BorderSizePixel = 0
+                Card.Parent = Page
+
+                local cCorner = Instance.new("UICorner")
+                cCorner.CornerRadius = UDim.new(0, 6)
+                cCorner.Parent = Card
+
+                local Label = Instance.new("TextLabel")
+                ApplyTextStyle(Label, "  " .. kName, 12, theme.Text, Enum.Font.GothamMedium)
+                Label.Size = UDim2.new(0.65, 0, 1, 0)
+                Label.Parent = Card
+
+                local KeyBtn = Instance.new("TextButton")
+                KeyBtn.Size = UDim2.new(0, 75, 0, 24)
+                KeyBtn.Position = UDim2.new(1, -85, 0.5, -12)
+                KeyBtn.BackgroundColor3 = theme.Header
+                ApplyTextStyle(KeyBtn, tostring(curKey), 11, theme.Accent, Enum.Font.GothamBold)
+                KeyBtn.TextXAlignment = Enum.TextXAlignment.Center
+                KeyBtn.Parent = Card
+
+                local kbCorner = Instance.new("UICorner")
+                kbCorner.CornerRadius = UDim.new(0, 4)
+                kbCorner.Parent = KeyBtn
+
+                local listening = false
+                KeyBtn.MouseButton1Click:Connect(function()
+                    listening = true
+                    KeyBtn.Text = "..."
+                end)
+
+                UserInputService.InputBegan:Connect(function(input, gpe)
+                    if not gpe and listening and input.KeyCode ~= Enum.KeyCode.Unknown then
+                        listening = false
+                        curKey = input.KeyCode.Name
+                        Vortex.Flags[flag] = curKey
+                        KeyBtn.Text = curKey
+                    elseif not gpe and not listening and input.KeyCode.Name == curKey then
+                        SafeCallback(cb, curKey)
+                    end
+                end)
+
+                table.insert(WindowObj.RegisteredElements, { Frame = Card, SearchText = kName })
+                return { Set = function(_, k) curKey = k; KeyBtn.Text = tostring(k) end }
+            end
+            TabObj.AddKeybind = TabObj.CreateKeybind
+
+            -- COLOR PICKER (Feature 9)
+            function TabObj:CreateColorPicker(opt)
+                opt = opt or {}
+                local cpName = opt.Name or opt[1] or "Color Picker"
+                local curColor = opt.Color or Color3.fromRGB(0, 240, 255)
+                local flag = opt.Flag or cpName
+                local cb = opt.Callback or opt[2]
+
+                local Card = Instance.new("Frame")
+                Card.Size = UDim2.new(1, -6, 0, 38)
+                Card.BackgroundColor3 = theme.Card
+                Card.BorderSizePixel = 0
+                Card.Parent = Page
+
+                local cCorner = Instance.new("UICorner")
+                cCorner.CornerRadius = UDim.new(0, 6)
+                cCorner.Parent = Card
+
+                local Label = Instance.new("TextLabel")
+                ApplyTextStyle(Label, "  " .. cpName, 12, theme.Text, Enum.Font.GothamMedium)
+                Label.Size = UDim2.new(0.7, 0, 1, 0)
+                Label.Parent = Card
+
+                local Preview = Instance.new("TextButton")
+                Preview.Size = UDim2.new(0, 28, 0, 22)
+                Preview.Position = UDim2.new(1, -38, 0.5, -11)
+                Preview.BackgroundColor3 = curColor
+                Preview.BorderSizePixel = 0
+                Preview.Text = ""
+                Preview.Parent = Card
+
+                local pCorner = Instance.new("UICorner")
+                pCorner.CornerRadius = UDim.new(0, 4)
+                pCorner.Parent = Preview
+
+                local palette = {
+                    Color3.fromRGB(0, 240, 255),
+                    Color3.fromRGB(46, 213, 115),
+                    Color3.fromRGB(255, 71, 87),
+                    Color3.fromRGB(255, 165, 2),
+                    Color3.fromRGB(165, 94, 234)
+                }
+                local pIndex = 1
+
+                Preview.MouseButton1Click:Connect(function()
+                    pIndex = (pIndex % #palette) + 1
+                    curColor = palette[pIndex]
+                    Preview.BackgroundColor3 = curColor
+                    Vortex.Flags[flag] = curColor
+                    SafeCallback(cb, curColor)
+                end)
+
+                table.insert(WindowObj.RegisteredElements, { Frame = Card, SearchText = cpName })
+                return { Set = function(_, c) curColor = c; Preview.BackgroundColor3 = c end }
+            end
+            TabObj.AddColorPicker = TabObj.CreateColorPicker
+
+            return TabObj
+        end
+
+        -- DIALOG CONFIRMATION MODAL
+        function WindowObj:Dialog(opt)
+            opt = opt or {}
+            local dTitle = opt.Title or "تأكيد"
+            local dContent = opt.Content or "هل أنت متأكد؟"
+            local btns = opt.Buttons or {}
+
+            local Overlay = Instance.new("Frame")
+            Overlay.Size = UDim2.new(1, 0, 1, 0)
+            Overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+            Overlay.BackgroundTransparency = 0.5
+            Overlay.ZIndex = 50
+            Overlay.Parent = Main
+
+            local Box = Instance.new("Frame")
+            Box.Size = UDim2.new(0, 300, 0, 130)
+            Box.Position = UDim2.new(0.5, -150, 0.5, -65)
+            Box.BackgroundColor3 = theme.Header
+            Box.ZIndex = 51
+            Box.Parent = Overlay
+
+            local bCorner = Instance.new("UICorner")
+            bCorner.CornerRadius = UDim.new(0, 8)
+            bCorner.Parent = Box
+
+            local tLbl = Instance.new("TextLabel")
+            ApplyTextStyle(tLbl, dTitle, 13, theme.Accent, Enum.Font.GothamBold)
+            tLbl.Position = UDim2.new(0, 10, 0, 8)
+            tLbl.Size = UDim2.new(1, -20, 0, 20)
+            tLbl.ZIndex = 52
+            tLbl.Parent = Box
+
+            local cLbl = Instance.new("TextLabel")
+            ApplyTextStyle(cLbl, dContent, 11, theme.Text, Enum.Font.Gotham)
+            cLbl.Position = UDim2.new(0, 10, 0, 32)
+            cLbl.Size = UDim2.new(1, -20, 0, 45)
+            cLbl.ZIndex = 52
+            cLbl.Parent = Box
+
+            local bHolder = Instance.new("Frame")
+            bHolder.Size = UDim2.new(1, -20, 0, 32)
+            bHolder.Position = UDim2.new(0, 10, 1, -38)
+            bHolder.BackgroundTransparency = 1
+            bHolder.ZIndex = 52
+            bHolder.Parent = Box
+
+            local bhLayout = Instance.new("UIListLayout")
+            bhLayout.FillDirection = Enum.FillDirection.Horizontal
+            bhLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+            bhLayout.Padding = UDim.new(0, 8)
+            bhLayout.Parent = bHolder
+
+            for _, bOpt in ipairs(btns) do
+                local ActionBtn = Instance.new("TextButton")
+                ActionBtn.Size = UDim2.new(0, 85, 1, 0)
+                ActionBtn.BackgroundColor3 = bOpt.Primary and theme.Accent or theme.Card
+                ApplyTextStyle(ActionBtn, bOpt.Title or "موافق", 11, bOpt.Primary and Color3.fromRGB(10, 15, 20) or theme.Text, Enum.Font.GothamBold)
+                ActionBtn.ZIndex = 53
+                ActionBtn.Parent = bHolder
+
+                local aCorner = Instance.new("UICorner")
+                aCorner.CornerRadius = UDim.new(0, 6)
+                aCorner.Parent = ActionBtn
+
+                ActionBtn.MouseButton1Click:Connect(function()
+                    Overlay:Destroy()
+                    SafeCallback(bOpt.Callback)
+                end)
+            end
+        end
+
+        return WindowObj
     end
 
-    return WindowObj
-end
+    -- NOTIFY SYSTEM (Feature 3)
+    function Vortex:Notify(titleOrOpt, content, duration)
+        local nTitle = "إشعار"
+        local nContent = ""
+        duration = 3
 
--- [ دالة إشعارات التوست ] --
-function Vortex:Notify(...)
-    local a = NormalizeArgs(...)
-    local title = type(a) == "table" and (a.Title or a[1]) or "VORTEX"
-    local content = type(a) == "table" and (a.Content or a[2]) or tostring(a)
-    print("[VORTEX NOTIFY]:", title, "-", content)
-end
+        if type(titleOrOpt) == "table" then
+            nTitle = titleOrOpt.Title or nTitle
+            nContent = titleOrOpt.Content or titleOrOpt.Text or ""
+            duration = titleOrOpt.Duration or duration
+        else
+            nTitle = tostring(titleOrOpt or nTitle)
+            nContent = tostring(content or "")
+        end
 
+        local targetGui = GetSafeGuiParent():FindFirstChildOfClass("ScreenGui")
+        if not targetGui then
+            targetGui = Instance.new("ScreenGui")
+            targetGui.Name = "VORTEX_NOTIF_GUI"
+            targetGui.Parent = GetSafeGuiParent()
+        end
 
---[[
-    ╔═════════════════════════════════════════════════════════════════════════════════════╗
-    ║                           [ 2. مثال تشغيل الهاب الفوري ]                           ║
-    ╚═════════════════════════════════════════════════════════════════════════════════════╝
-]]
+        local Holder = targetGui:FindFirstChild("VortexNotifHolder")
+        if not Holder then
+            Holder = Instance.new("Frame")
+            Holder.Name = "VortexNotifHolder"
+            Holder.Size = UDim2.new(0, 260, 1, -20)
+            Holder.Position = UDim2.new(1, -270, 0, 10)
+            Holder.BackgroundTransparency = 1
+            Holder.Parent = targetGui
+
+            local nLayout = Instance.new("UIListLayout")
+            nLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+            nLayout.Padding = UDim.new(0, 8)
+            nLayout.Parent = Holder
+        end
+
+        local Toast = Instance.new("Frame")
+        Toast.Size = UDim2.new(1, 0, 0, 60)
+        Toast.BackgroundColor3 = Vortex.Themes.CyberDark.Header
+        Toast.BorderSizePixel = 0
+        Toast.Parent = Holder
+
+        local tCorner = Instance.new("UICorner")
+        tCorner.CornerRadius = UDim.new(0, 8)
+        tCorner.Parent = Toast
+
+        local tStroke = Instance.new("UIStroke")
+        tStroke.Color = Vortex.Themes.CyberDark.Accent
+        tStroke.Thickness = 1.2
+        tStroke.Parent = Toast
+
+        local tTitle = Instance.new("TextLabel")
+        ApplyTextStyle(tTitle, nTitle, 12, Vortex.Themes.CyberDark.Accent, Enum.Font.GothamBold)
+        tTitle.Position = UDim2.new(0, 10, 0, 6)
+        tTitle.Size = UDim2.new(1, -20, 0, 16)
+        tTitle.Parent = Toast
+
+        local tBody = Instance.new("TextLabel")
+        ApplyTextStyle(tBody, nContent, 10, Vortex.Themes.CyberDark.Text, Enum.Font.Gotham)
+        tBody.Position = UDim2.new(0, 10, 0, 24)
+        tBody.Size = UDim2.new(1, -20, 0, 26)
+        tBody.Parent = Toast
+
+        local Prog = Instance.new("Frame")
+        Prog.Size = UDim2.new(1, 0, 0, 2)
+        Prog.Position = UDim2.new(0, 0, 1, -2)
+        Prog.BackgroundColor3 = Vortex.Themes.CyberDark.Accent
+        Prog.BorderSizePixel = 0
+        Prog.Parent = Toast
+
+        FastTween(Prog, { Size = UDim2.new(0, 0, 0, 2) }, duration)
+        task.delay(duration, function()
+            FastTween(Toast, { BackgroundTransparency = 1 }, 0.2)
+            FastTween(tTitle, { TextTransparency = 1 }, 0.2)
+            FastTween(tBody, { TextTransparency = 1 }, 0.2)
+            FastTween(tStroke, { Transparency = 1 }, 0.2)
+            task.wait(0.2)
+            Toast:Destroy()
+        end)
+    end
+
+    return Vortex
+end)()
+
+-------------------------------------------------------------------------
+-- [ تجربة السكربت الميداني لاختبار كافة الميزات العشر في Delta Mobile ] --
+-------------------------------------------------------------------------
 
 local Window = Vortex:CreateWindow({
-    Name = "VORTEX ULTIMATE",
+    Name = "VORTEX BEAST",
     SubTitle = "Delta Mobile 2026",
-    Theme = "CyberDark",
-    MobileToggle = true,
-    Size = UDim2.fromOffset(560, 360)
+    Theme = "CyberDark"
 })
 
--- تبويب اللاعب
-local PlayerTab = Window:CreateTab("اللاعب", "👤")
-PlayerTab:Section("السرعة والقفز")
+-- الميزة 3: إشعار ترحيبي عائم
+Vortex:Notify({
+    Title = "VORTEX v3.5",
+    Content = "تم تشغيل المكتبة بنجاح! جميع الميزات العشر مدعومة 100%.",
+    Duration = 3.5
+})
 
-PlayerTab:Button("إعادة إنعاش فوري (Respawn)", function()
-    local char = game.Players.LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.Health = 0
+-- التبويب الأول: خصائص اللاعب والسرعة
+local TabPlayer = Window:CreateTab("اللاعب", "👤")
+TabPlayer:CreateSection("السرعة والفيزياء (دعم كامل للعربية RTL)")
+
+-- الميزة 2: حقل إدخال نصوص وأرقام لكتابة السرعة المخصصة (0.09 أو أي رقم)
+TabPlayer:CreateInput({
+    Name = "كتابة سرعة مخصصة بدقة",
+    PlaceholderText = "مثال: 0.09 أو 120...",
+    Callback = function(text)
+        local num = tonumber(text)
+        if num then
+            local char = game.Players.LocalPlayer.Character
+            if char and char:FindFirstChild("Humanoid") then
+                char.Humanoid.WalkSpeed = num
+                Vortex:Notify("تم التعديل", "تم ضبط سرعة اللاعب على: " .. tostring(num), 2.5)
+            end
+        else
+            Vortex:Notify("تنبيه", "يرجى كتابة رقم صحيح فقط!", 2)
+        end
     end
-end)
+})
 
-PlayerTab:Slider("سرعة المشي (WalkSpeed)", 16, 250, 16, function(v)
-    local char = game.Players.LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.WalkSpeed = v
+-- الميزة 6: حفظ الحالة عبر الـ Flags
+TabPlayer:CreateToggle({
+    Name = "القفز اللانهائي في الهواء",
+    CurrentValue = false,
+    Flag = "InfiniteJumpFlag",
+    Callback = function(state)
+        print("Flag InfiniteJump is:", state, "Stored in Vortex.Flags:", Vortex.Flags.InfiniteJumpFlag)
+        Vortex:Notify("الحالة", state and "تم تفعيل القفز اللانهائي" or "تم إيقاف القفز", 2)
     end
-end)
+})
 
-PlayerTab:Slider("قوة القفز (JumpPower)", 50, 400, 50, function(v)
-    local char = game.Players.LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.JumpPower = v
+TabPlayer:CreateSlider({
+    Name = "شريط سرعة المشي المباشر",
+    Range = {16, 250},
+    CurrentValue = 16,
+    Flag = "SpeedSliderFlag",
+    Callback = function(val)
+        local char = game.Players.LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.WalkSpeed = val
+        end
     end
-end)
+})
 
-PlayerTab:Toggle("القفز اللانهائي (Infinite Jump)", false, function(state)
-    print("Infinite Jump:", state)
-end)
+-- التبويب الثاني: الأوتوفارم والقوائم والمفاتيح
+local TabFarm = Window:CreateTab("الأوتو", "⚡")
+TabFarm:CreateSection("التجميع والقوائم المنسدلة")
 
--- تبويب الأوتوفارم
-local FarmTab = Window:CreateTab("الأوتوفارم", "⚡")
-FarmTab:Section("التجميع التلقائي")
+-- الميزة 4: قائمة منسدلة متعددة الخيارات (CreateDropdown)
+TabFarm:CreateDropdown({
+    Name = "اختيار أسلوب الهجوم",
+    Options = {"الأقرب جغرافياً", "أضعف صحة", "أعلى مكافأة", "الزعماء فقط"},
+    Flag = "TargetModeFlag",
+    Callback = function(selected)
+        Vortex:Notify("الهدف", "تم تحديد النمط: " .. selected, 2)
+    end
+})
 
-FarmTab:Toggle("تجميع الكوينز التلقائي (Auto Farm)", false, function(state)
-    print("Auto Farm state:", state)
-end)
+-- الميزة 8: اختصار المفاتيح وزر اللمس (CreateKeybind)
+TabFarm:CreateKeybind({
+    Name = "مفتاح تشغيل الأوتوفارم السريع",
+    Default = "E",
+    Callback = function(key)
+        Vortex:Notify("اختصار المفاتيح", "تم الضغط على المفتاح: " .. tostring(key), 2)
+    end
+})
 
-FarmTab:Dropdown("أولوية الاستهداف", {"الأقرب جغرافياً", "أضعف دم", "الزعماء فقط"}, function(opt)
-    print("Target mode:", opt)
-end)
+-- الميزة 9: محدد الألوان التفاعلي (CreateColorPicker)
+TabFarm:CreateColorPicker({
+    Name = "لون تحديد الأعداء (ESP Color)",
+    Color = Color3.fromRGB(0, 240, 255),
+    Flag = "ESPColorFlag",
+    Callback = function(color)
+        Vortex:Notify("الألوان", "تم تغيير لون التحديد!", 2)
+    end
+})
 
--- تبويب الانتقال
-local TeleportTab = Window:CreateTab("الانتقال", "🚀")
-TeleportTab:Section("الانتقال السريع")
+-- التبويب الثالث: الإعدادات والنوافذ المنبثقة
+local TabSettings = Window:CreateTab("الإعدادات", "⚙️")
+TabSettings:CreateSection("النظام والأمان والحفظ")
 
-TeleportTab:Dropdown("اختر المكان", {"السباون", "السوق", "الحلبة", "الخزينة السرية"}, function(loc)
-    print("Teleported to:", loc)
-end)
-
-return Vortex
+-- نافذة تأكيد تفاعلية (Dialog)
+TabSettings:CreateButton({
+    Name = "إعادة ضبط السكربت (نافذة Dialog)",
+    Callback = function()
+        Window:Dialog({
+            Title = "تأكيد إعادة الضبط",
+            Content = "هل تريد حقاً إعادة ضبط جميع الإعدادات للوضع الافتراضي؟",
+            Buttons = {
+                {
+                    Title = "نعم، أعد الضبط",
+                    Primary = true,
+                    Callback = function()
+                        Vortex:Notify("تم الضبط", "تمت إعادة ضبط السكربت بنجاح!", 2.5)
+                    end
+                },
+                {
+                    Title = "إلغاء",
+                    Callback = function()
+                        Vortex:Notify("إلغاء", "تم إلغاء العملية.", 1.5)
+                    end
+                }
+            }
+        })
+    end
+})
