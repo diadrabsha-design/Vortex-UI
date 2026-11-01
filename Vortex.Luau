@@ -1,8 +1,8 @@
 --[[
     ╔═════════════════════════════════════════════════════════════════════════════════════╗
-    ║                 VORTEX UI v3.5 - STANDALONE ALL-IN-ONE BEAST EDITION                ║
-    ║       Zero Network Dependency - 100% Offline & Compatible with Delta Mobile 2026    ║
-    ║       Fixed: Freedom of Upward Drag, IgnoreGuiInset, Full RTL Arabic Support        ║
+    ║                     VORTEX UI - THE ULTIMATE BEAST EDITION v3.5                     ║
+    ║       Engineered for Roblox & Delta Executor 2026 Mobile - Pure & Complete Engine   ║
+    ║       Zero Network Dependency • 10/10 Core Pillars Supported • Unrestricted Drag    ║
     ╚═════════════════════════════════════════════════════════════════════════════════════╝
 ]]
 
@@ -72,6 +72,7 @@ local Vortex = (function()
         return t
     end
 
+    -- تغليف آمن يمنع انهيار الواجهة عند حدوث أي خطأ في سكربتات المستخدم
     local function SafeCallback(cb, ...)
         if type(cb) ~= "function" then return true end
         local args = { ... }
@@ -80,6 +81,7 @@ local Vortex = (function()
         return ok
     end
 
+    -- فحص ذكي للغة العربية لمحاذاة النصوص ومنع التداخل
     local function IsArabicText(str)
         if type(str) ~= "string" then return false end
         for i = 1, #str do
@@ -105,6 +107,7 @@ local Vortex = (function()
         end
     end
 
+    -- دالة إنشاء النافذة الرئيسية
     function Vortex:CreateWindow(config)
         config = config or {}
         local WindowName = config.Name or "VORTEX BEAST"
@@ -117,15 +120,15 @@ local Vortex = (function()
         local winH = math.clamp(vp.Y - 50, 280, 360)
         local WindowSize = config.Size or UDim2.fromOffset(winW, winH)
 
-        -- 1. ScreenGui مع تفعيل IgnoreGuiInset للحركة الحرة للأعلى
+        -- 1. ScreenGui مع IgnoreGuiInset لفك قفل السحب للأعلى
         local ScreenGui = Instance.new("ScreenGui")
         ScreenGui.Name = "VORTEX_" .. HttpService:GenerateGUID(false):sub(1, 8)
         ScreenGui.ResetOnSpawn = false
         ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-        ScreenGui.IgnoreGuiInset = true -- يسمح بسحب النافذة لأعلى الشاشة دون عوائق
+        ScreenGui.IgnoreGuiInset = true -- تحريك حر للشاشة كاملة حتى القمة
         ScreenGui.Parent = GetSafeGuiParent()
 
-        -- 2. مقياس الشاشة الذكي UIScale
+        -- 2. مقياس الهاتف الذكي
         local UIScale = Instance.new("UIScale")
         UIScale.Parent = ScreenGui
         local function UpdateDPI()
@@ -150,7 +153,7 @@ local Vortex = (function()
             return 1
         end
 
-        -- 3. الإطار الأساسي MainFrame
+        -- 3. هيكل النافذة الرئيسي
         local MainFrame = Instance.new("Frame")
         MainFrame.Name = "MainFrame"
         MainFrame.Size = WindowSize
@@ -169,7 +172,7 @@ local Vortex = (function()
         MainStroke.Thickness = 1.2
         MainStroke.Parent = MainFrame
 
-        -- 4. الشريط العلوي Header مع منطقة سحب موسعة
+        -- 4. الشريط العلوي (منطقة السحب الكاملة)
         local Header = Instance.new("Frame")
         Header.Name = "Header"
         Header.Size = UDim2.new(1, 0, 0, 48)
@@ -196,7 +199,7 @@ local Vortex = (function()
         SubTitleLabel.Active = false
         SubTitleLabel.Parent = Header
 
-        -- شريط البحث الفوري
+        -- شريط البحث الفوري التفاعلي
         local SearchBox = Instance.new("TextBox")
         SearchBox.PlaceholderText = "🔍 بحث سريع..."
         SearchBox.Font = Enum.Font.Gotham
@@ -229,7 +232,7 @@ local Vortex = (function()
         cbCorner.CornerRadius = UDim.new(0, 6)
         cbCorner.Parent = CloseBtn
 
-        -- 5. محرك السحب فائق السلاسة والدقة
+        -- 5. محرك السحب باللمس والماوس مع تعويض الـ Scale
         local isDragging = false
         local dragStart = Vector3.new()
         local startPos = UDim2.new()
@@ -326,7 +329,7 @@ local Vortex = (function()
 
         CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end)
 
-        -- 7. حاوية التبويبات والمحتوى
+        -- 7. منطقة التبويبات والمحتوى الداخلي
         local Body = Instance.new("Frame")
         Body.Size = UDim2.new(1, 0, 1, -48)
         Body.Position = UDim2.new(0, 0, 0, 48)
@@ -353,7 +356,7 @@ local Vortex = (function()
 
         local WindowObj = { _gui = ScreenGui, _main = MainFrame, _tabs = {} }
 
-        -- البحث الفوري
+        -- فلتر البحث الحي
         SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
             local q = SearchBox.Text:lower():gsub("%s+", "")
             for _, tab in ipairs(WindowObj._tabs) do
@@ -365,7 +368,7 @@ local Vortex = (function()
             end
         end)
 
-        -- إنشاء تبويب
+        -- دالة إنشاء تبويب
         function WindowObj:CreateTab(tabName, icon)
             icon = icon or "⚡"
             local TabBtn = Instance.new("TextButton")
@@ -423,7 +426,7 @@ local Vortex = (function()
             if #WindowObj._tabs == 0 then SelectTab() end
             table.insert(WindowObj._tabs, TabObj)
 
-            -- إضافة قسم
+            -- [ 1. إنشاء عنوان قسم Section ]
             function TabObj:CreateSection(sTitle)
                 local SecLbl = Instance.new("TextLabel")
                 ApplyTextStyle(SecLbl, string.upper(sTitle), 11, Theme.Accent, Enum.Font.GothamBold)
@@ -432,7 +435,7 @@ local Vortex = (function()
                 return SecLbl
             end
 
-            -- زر
+            -- [ 2. إنشاء زر Button ]
             function TabObj:CreateButton(opt)
                 opt = opt or {}
                 local bName = opt.Name or opt[1] or "Button"
@@ -478,7 +481,7 @@ local Vortex = (function()
             end
             TabObj.AddButton = TabObj.CreateButton
 
-            -- حقل إدخال (CreateInput)
+            -- [ 3. إنشاء حقل إدخال نصوص وأرقام Input ]
             function TabObj:CreateInput(opt)
                 opt = opt or {}
                 local iName = opt.Name or opt[1] or "Input Box"
@@ -533,7 +536,7 @@ local Vortex = (function()
             TabObj.CreateTextBox = TabObj.CreateInput
             TabObj.AddInput = TabObj.CreateInput
 
-            -- توجل
+            -- [ 4. إنشاء مفتاح تفعيل Toggle ]
             function TabObj:CreateToggle(opt)
                 opt = opt or {}
                 local tName = opt.Name or opt[1] or "Toggle"
@@ -598,7 +601,7 @@ local Vortex = (function()
             end
             TabObj.AddToggle = TabObj.CreateToggle
 
-            -- سلايدر
+            -- [ 5. إنشاء شريط تمرير أرقام Slider ]
             function TabObj:CreateSlider(opt)
                 opt = opt or {}
                 local sName = opt.Name or opt[1] or "Slider"
@@ -699,7 +702,7 @@ local Vortex = (function()
             end
             TabObj.AddSlider = TabObj.CreateSlider
 
-            -- قائمة منسدلة Dropdown
+            -- [ 6. إنشاء قائمة منسدلة Dropdown ]
             function TabObj:CreateDropdown(opt)
                 opt = opt or {}
                 local dName = opt.Name or opt[1] or "Dropdown"
@@ -791,7 +794,7 @@ local Vortex = (function()
             end
             TabObj.AddDropdown = TabObj.CreateDropdown
 
-            -- مفاتيح ولمس Keybind
+            -- [ 7. إنشاء زر اختصار وتفاعل باللمس Keybind ]
             function TabObj:CreateKeybind(opt)
                 opt = opt or {}
                 local kName = opt.Name or opt[1] or "Keybind"
@@ -863,7 +866,7 @@ local Vortex = (function()
             end
             TabObj.AddKeybind = TabObj.CreateKeybind
 
-            -- محدد الألوان ColorPicker
+            -- [ 8. إنشاء محدد الألوان ColorPicker ]
             function TabObj:CreateColorPicker(opt)
                 opt = opt or {}
                 local cName = opt.Name or opt[1] or "Color Picker"
@@ -929,7 +932,7 @@ local Vortex = (function()
             return TabObj
         end
 
-        -- نافذة التأكيد Dialog
+        -- [ نافذة تأكيد منبثقة تفاعلية Dialog ]
         function WindowObj:Dialog(dConfig)
             dConfig = dConfig or {}
             local dTitle = dConfig.Title or "تأكيد"
@@ -1016,11 +1019,11 @@ local Vortex = (function()
         return WindowObj
     end
 
-    -- نظام الإشعارات المنبثقة Notify
+    -- [ نظام الإشعارات المنبثقة المرئي الشاشي Notify ]
     function Vortex:Notify(titleOrOpt, content, duration)
         local nTitle = "إشعار"
         local nContent = ""
-        duration = 3
+        duration = 3.5
 
         if type(titleOrOpt) == "table" then
             nTitle = titleOrOpt.Title or nTitle
@@ -1102,122 +1105,89 @@ local Vortex = (function()
     return Vortex
 end)()
 
--------------------------------------------------------------------------
--- [ تجربة السكربت الميداني لاختبار كافة الميزات العشر في Delta Mobile ] --
--------------------------------------------------------------------------
+--------------------------------------------------------------------------------------
+-- [ 🌟 القالب الفارغ الجاهز للبدء بإضافة سكربتاتك وأزرارك الخاصة مباشرة ] --
+--------------------------------------------------------------------------------------
 
+-- 1. إنشاء النافذة
 local Window = Vortex:CreateWindow({
-    Name = "VORTEX BEAST",
-    SubTitle = "Delta Mobile 2026"
+    Name = "My Script Hub",           -- اسم السكربت الخاص بك
+    SubTitle = "Delta Mobile 2026"     -- النص الفرعي
 })
 
--- إشعار عائم
-Vortex:Notify({
-    Title = "VORTEX v3.5",
-    Content = "تم تشغيل المكتبة بنجاح! تم حل مشكلة التحريك للأعلى والواجهة تعمل بسلاسة 100%.",
-    Duration = 3.5
-})
+-- 2. إرسال إشعار ترحيبي اختياري
+Vortex:Notify("VORTEX UI", "تم تشغيل السكربت بنجاح!", 3)
 
--- التبويب 1: اللاعب والسرعة
-local TabPlayer = Window:CreateTab("اللاعب", "👤")
-TabPlayer:CreateSection("السرعة والفيزياء (دعم كامل للعربية RTL)")
+-- 3. إنشاء التبويب الأول (ابregist هنا ما تريد)
+local MainTab = Window:CreateTab("الرئيسية", "⚡")
 
--- حقل إدخال السرعة بدقة
-TabPlayer:CreateInput({
-    Name = "كتابة سرعة مخصصة بدقة",
-    PlaceholderText = "مثال: 0.09 أو 120...",
-    Callback = function(text)
-        local num = tonumber(text)
-        if num then
-            local char = game.Players.LocalPlayer.Character
-            if char and char:FindFirstChild("Humanoid") then
-                char.Humanoid.WalkSpeed = num
-                Vortex:Notify("تم التعديل", "تم ضبط السرعة على: " .. tostring(num), 2.5)
-            end
-        else
-            Vortex:Notify("تنبيه", "يرجى كتابة رقم صحيح فقط!", 2)
+-- قسم
+MainTab:CreateSection("الميزات الأساسية")
+
+-- [[
+    يمكنك الآن البدء بإضافة ما تريده من الدوال الجاهزة أدناه:
+
+    1. إضافة زر:
+    MainTab:CreateButton({
+        Name = "اسم الزر",
+        Callback = function()
+            -- ضع كودك هنا
         end
-    end
-})
+    })
 
--- حفظ الحالة في الـ Flags
-TabPlayer:CreateToggle({
-    Name = "القفز اللانهائي في الهواء",
-    CurrentValue = false,
-    Flag = "InfiniteJumpFlag",
-    Callback = function(state)
-        Vortex:Notify("الحالة", state and "تم تفعيل القفز اللانهائي" or "تم الإيقاف", 2)
-    end
-})
-
-TabPlayer:CreateSlider({
-    Name = "شريط سرعة المشي المباشر",
-    Range = {16, 250},
-    CurrentValue = 16,
-    Flag = "SpeedSliderFlag",
-    Callback = function(val)
-        local char = game.Players.LocalPlayer.Character
-        if char and char:FindFirstChild("Humanoid") then
-            char.Humanoid.WalkSpeed = val
+    2. إضافة حقل إدخال (نص أو رقم مثل السرعة 0.09):
+    MainTab:CreateInput({
+        Name = "سرعة المشي",
+        PlaceholderText = "مثال: 0.09...",
+        Callback = function(text)
+            -- text هو النص أو الرقم المكتوب
         end
-    end
-})
+    })
 
--- التبويب 2: الأوتوفارم والقوائم والمفاتيح
-local TabFarm = Window:CreateTab("الأوتو", "⚡")
-TabFarm:CreateSection("التجميع والقوائم المنسدلة")
+    3. إضافة توجل (تفعيل / إيقاف):
+    MainTab:CreateToggle({
+        Name = "ميزة تلقائية",
+        CurrentValue = false,
+        Flag = "MyFeatureFlag", -- لحفظ الحالة
+        Callback = function(state)
+            -- state تكون true أو false
+        end
+    })
 
-TabFarm:CreateDropdown({
-    Name = "اختيار أسلوب الهجوم",
-    Options = {"الأقرب جغرافياً", "أضعف صحة", "أعلى مكافأة", "الزعماء فقط"},
-    Flag = "TargetModeFlag",
-    Callback = function(selected)
-        Vortex:Notify("الهدف", "تم تحديد النمط: " .. selected, 2)
-    end
-})
+    4. إضافة سلايدر:
+    MainTab:CreateSlider({
+        Name = "السرعة",
+        Range = {16, 250},
+        CurrentValue = 16,
+        Callback = function(value)
+            -- value هو الرقم المختار
+        end
+    })
 
-TabFarm:CreateKeybind({
-    Name = "مفتاح تشغيل الأوتوفارم السريع",
-    Default = "E",
-    Callback = function(key)
-        Vortex:Notify("اختصار المفاتيح", "تم الضغط على المفتاح: " .. tostring(key), 2)
-    end
-})
+    5. إضافة قائمة منسدلة Dropdown:
+    MainTab:CreateDropdown({
+        Name = "اختيار خيار",
+        Options = {"الخيار 1", "الخيار 2", "الخيار 3"},
+        Callback = function(selected)
+            -- selected هو الخيار الذي تم ضغطه
+        end
+    })
 
-TabFarm:CreateColorPicker({
-    Name = "لون تحديد الأعداء (ESP Color)",
-    Color = Color3.fromRGB(0, 240, 255),
-    Flag = "ESPColorFlag",
-    Callback = function(color)
-        Vortex:Notify("الألوان", "تم تحديث لون التحديد!", 2)
-    end
-})
+    6. إضافة اختصار Keybind:
+    MainTab:CreateKeybind({
+        Name = "زر التشغيل",
+        Default = "E",
+        Callback = function(key)
+            -- يعمل بالضغط على الهاتف أو بالكيبورد
+        end
+    })
 
--- التبويب 3: الإعدادات والنوافذ المنبثقة
-local TabSettings = Window:CreateTab("الإعدادات", "⚙️")
-TabSettings:CreateSection("النظام والأمان")
-
-TabSettings:CreateButton({
-    Name = "إعادة ضبط السكربت (نافذة Dialog)",
-    Callback = function()
-        Window:Dialog({
-            Title = "تأكيد إعادة الضبط",
-            Content = "هل تريد حقاً إعادة ضبط جميع الإعدادات للوضع الافتراضي؟",
-            Buttons = {
-                {
-                    Title = "نعم، أعد الضبط",
-                    Primary = true,
-                    Callback = function()
-                        Vortex:Notify("تم الضبط", "تمت إعادة الضبط بنجاح!", 2.5)
-                    end
-                },
-                {
-                    Title = "إلغاء",
-                    Callback = function()
-                        Vortex:Notify("إلغاء", "تم إلغاء العملية.", 1.5)
-                    end
-                }
-            }
-        })
-    end
-})
+    7. إضافة محدد ألوان ColorPicker:
+    MainTab:CreateColorPicker({
+        Name = "لون التحديد",
+        Color = Color3.fromRGB(0, 240, 255),
+        Callback = function(color)
+            -- color كود Color3
+        end
+    })
+]]
