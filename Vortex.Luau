@@ -1,7 +1,8 @@
 --[[ ======================================================================
-    AURA LUXE v3  |  Mobile-first Roblox UI Library (Delta / Codex / Arceus)
+    AURA LUXE v3.5  |  Mobile-first Roblox UI Library (Delta / Codex / Arceus)
     - Rounded window (header corners fixed), touch-sized controls
-    - Themes, HSV color picker, multi-dropdown, keybind modes, key system
+    - RichText enabled, Multi-Column Layout, HSV picker, multi-dropdown
+    - Responsive sliders, mobile keyboard-safe input, keybind modes
     - Config slots + AutoSave/AutoLoad, stacking notifications, watermark
     - Full cleanup (no leaked connections), re-execute safe
     ====================================================================== ]]
@@ -70,7 +71,7 @@ for k, v in pairs(Themes.Dark) do T[k] = v end
 
 local FONT, FONTB = Enum.Font.GothamMedium, Enum.Font.GothamBold
 
-local Lib = { Version = "3.0", Flags = {}, Registry = {}, NoSave = {}, Themes = Themes, _wins = {} }
+local Lib = { Version = "3.5", Flags = {}, Registry = {}, NoSave = {}, Themes = Themes, _wins = {} }
 
 -- ======================= Helpers =======================
 local function Th(inst, prop, key) inst[prop] = T[key]; Bound[#Bound + 1] = { inst, prop, key } end
@@ -120,11 +121,13 @@ local function Measure(text, size, width)
     return size + 2
 end
 
+-- [Feature 1 Added]: RichText Enabled for all labels
 local function Label(parent, text, size, key, font, x)
     local l = Instance.new("TextLabel")
     l.BackgroundTransparency = 1; l.Text = text or ""; l.TextSize = size or 13
     l.Font = font or FONT; Th(l, "TextColor3", key or "Text")
     l.TextXAlignment = x or Align(text); l.TextTruncate = Enum.TextTruncate.AtEnd
+    l.RichText = true
     l.Parent = parent; return l
 end
 
@@ -257,12 +260,12 @@ function Lib:CreateWindow(cfg)
         SG.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, T.Accent), ColorSequenceKeypoint.new(.5, T.Accent2), ColorSequenceKeypoint.new(1, T.Stroke) })
     end)()
 
-    -- ---------- Header (rounded top!) ----------
+    -- ---------- Header ----------
     local Header = Instance.new("Frame")
     Header.Name = "Header"; Header.Size = UDim2.new(1, 0, 0, 46); Header.BorderSizePixel = 0
     Th(Header, "BackgroundColor3", "Header"); Header.Parent = Main
     Corner(Header, 14)
-    local HPatch = Instance.new("Frame")     -- squares only the bottom edge of the header
+    local HPatch = Instance.new("Frame")
     HPatch.Size = UDim2.new(1, 0, 0, 14); HPatch.Position = UDim2.new(0, 0, 1, -14); HPatch.BorderSizePixel = 0
     Th(HPatch, "BackgroundColor3", "Header"); HPatch.Parent = Header
     local HLine = Instance.new("Frame")
@@ -293,7 +296,7 @@ function Lib:CreateWindow(cfg)
     Conn(Search:GetPropertyChangedSignal("Text"), function()
         local q = string.lower(Search.Text):match("^%s*(.-)%s*$")
         for _, e in ipairs(Win.Elements) do
-            if e.Frame.Parent then e.Frame.Visible = (q == "") or (e.Key:find(q, 1, true) ~= nil) end
+            if e.Frame and e.Frame.Parent then e.Frame.Visible = (q == "") or (e.Key:find(q, 1, true) ~= nil) end
         end
     end)
 
@@ -309,7 +312,7 @@ function Lib:CreateWindow(cfg)
     local Content = Instance.new("Frame"); Content.BackgroundTransparency = 1
     Content.Position = UDim2.fromOffset(144, 54); Content.Size = UDim2.new(1, -152, 1, -62); Content.Parent = Main
 
-    -- ---------- Dragging (rounded, scale-safe, click-vs-drag aware) ----------
+    -- ---------- Dragging ----------
     local function MakeDraggable(handle, target)
         local st = { moved = false }
         local dragging, startPos, startCenter = false, nil, nil
@@ -337,7 +340,6 @@ function Lib:CreateWindow(cfg)
     end
     MakeDraggable(Header, Main)
 
-    -- generic pointer drag for sliders / pickers (locks page scrolling while dragging)
     local function PointerDrag(frame, page, fn)
         local active = false
         Conn(frame.InputBegan, function(i)
@@ -368,7 +370,6 @@ function Lib:CreateWindow(cfg)
     if Workspace.CurrentCamera then Conn(Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"), Rescale) end
     Conn(Gui:GetPropertyChangedSignal("AbsoluteSize"), Rescale)
 
-    -- toggle keybind (PC) + floating button (mobile)
     local tk = cfg.ToggleUIKeybind or "RightShift"
     if typeof(tk) == "EnumItem" then tk = tk.Name end
     Conn(UIS.InputBegan, function(i, gpe)
@@ -464,12 +465,14 @@ function Lib:CreateWindow(cfg)
 
     function Win:SetTheme(n) return ApplyTheme(n) end
 
-    -- ---------- Watermark ----------
+    -- ---------- [Feature 2 Added]: Watermark with dynamic UIStroke ----------
     function Win:CreateWatermark(text)
         text = text or Title
         local F = Instance.new("Frame"); F.AnchorPoint = Vector2.new(1, 0); F.Position = UDim2.new(1, -12, 0, 10)
         F.Size = UDim2.fromOffset(0, 26); F.AutomaticSize = Enum.AutomaticSize.X; F.BorderSizePixel = 0
-        Th(F, "BackgroundColor3", "Card"); F.Parent = Gui; Corner(F, 8); Stroke(F, "Stroke", 1); Pad(F, 10, 0, 10, 0)
+        Th(F, "BackgroundColor3", "Card"); F.Parent = Gui; Corner(F, 8)
+        Stroke(F, "Stroke", 1) -- Guaranteed visible themed border
+        Pad(F, 10, 0, 10, 0)
         local L = Label(F, text, 11, "Text", FONTB); L.Size = UDim2.new(0, 0, 1, 0); L.AutomaticSize = Enum.AutomaticSize.X
         L.TextTruncate = Enum.TextTruncate.None
         local frames, last, ping = 0, os.clock(), 0
@@ -511,7 +514,6 @@ function Lib:CreateWindow(cfg)
         Pad(Page, 0, 2, 6, 8)
         local PL = Instance.new("UIListLayout"); PL.Padding = UDim.new(0, 6); PL.SortOrder = Enum.SortOrder.LayoutOrder; PL.Parent = Page
 
-        -- smooth wheel scroll (PC)
         local tgt = 0
         Conn(Page.InputChanged, function(i)
             if i.UserInputType == Enum.UserInputType.MouseWheel then
@@ -529,7 +531,10 @@ function Lib:CreateWindow(cfg)
         end
         obj.Paint = Paint
         Hook(function() Paint(Win.Current == obj) end)
+
+        -- [Bug 1 Fixed]: Clears search bar text automatically when switching tabs
         function Tab:Select()
+            if Search then Search.Text = "" end
             if Win.Current == obj then return end
             local old = Win.Current
             Win.Current = obj
@@ -539,439 +544,515 @@ function Lib:CreateWindow(cfg)
         Btn.Activated:Connect(function() Tab:Select() end)
         if not Win.Current then Tab:Select() end
 
-        -- ===== element base =====
-        local order = 0
-        local function Base(c, o)
-            o = o or {}
-            order += 1
-            local nm = c.Name or "Element"
-            local desc = c.Desc or c.Description
-            local hasDesc = desc ~= nil and desc ~= ""
-            local rightW, extra = o.rightW or 0, o.extra or 0
-            local textW = PAGE_W - 24 - rightW
-            local h, dh = 38, 0
-            if hasDesc then dh = Measure(desc, 11, textW); h = 26 + dh + 8 end
-            h += extra
-            local stack = hasDesc or extra > 0
-            local F = Instance.new(o.clickable and "TextButton" or "Frame")
-            F.Name = nm; F.Size = UDim2.new(1, 0, 0, h); F.BorderSizePixel = 0; F.LayoutOrder = order
-            Th(F, "BackgroundColor3", "Card")
-            if o.clickable then F.Text = ""; F.AutoButtonColor = false end
-            F.Parent = Page; Corner(F, 8); Stroke(F, "Stroke", 1)
-            local L = Label(F, nm, 13, "Text", FONT)
-            L.Position = UDim2.fromOffset(12, stack and 6 or 0)
-            L.Size = stack and UDim2.new(1, -(24 + rightW), 0, 18) or UDim2.new(1, -(24 + rightW), 1, 0)
-            local D
-            if hasDesc then
-                D = Label(F, desc, 11, "SubText", FONT); D.TextWrapped = true; D.TextTruncate = Enum.TextTruncate.None
-                D.TextYAlignment = Enum.TextYAlignment.Top; D.Position = UDim2.fromOffset(12, 26)
-                D.Size = UDim2.new(1, -(24 + rightW), 0, dh)
-            end
-            Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower(nm .. " " .. (desc or "")) }
-            if o.clickable then
-                F.MouseEnter:Connect(function() Tw(F, { BackgroundColor3 = T.CardHover }, .12) end)
-                F.MouseLeave:Connect(function() Tw(F, { BackgroundColor3 = T.Card }, .12) end)
-            end
-            return F, L, D
-        end
-        local function Reg(flag, ctrl, c)
-            Lib.Registry[flag] = function(v) ctrl:Set(v) end
-            if c.NoSave then Lib.NoSave[flag] = true end
-        end
-
-        -- ===== Section / Label / Paragraph / Divider =====
-        function Tab:CreateSection(text)
-            order += 1
-            local F = Instance.new("Frame"); F.BackgroundTransparency = 1; F.Size = UDim2.new(1, 0, 0, 26); F.LayoutOrder = order; F.Parent = Page
-            local L = Label(F, text or "SECTION", 12, "Accent", FONTB); L.Position = UDim2.fromOffset(4, 0); L.Size = UDim2.new(1, -8, 0, 22)
-            local ln = Instance.new("Frame"); ln.Size = UDim2.new(1, 0, 0, 1); ln.Position = UDim2.new(0, 0, 1, -2); ln.BorderSizePixel = 0
-            Th(ln, "BackgroundColor3", "Stroke"); ln.Parent = F
-            return { Set = function(_, t) L.Text = t; L.TextXAlignment = Align(t) end }
-        end
-        function Tab:CreateDivider()
-            order += 1
-            local ln = Instance.new("Frame"); ln.Size = UDim2.new(1, 0, 0, 1); ln.BorderSizePixel = 0; ln.LayoutOrder = order
-            Th(ln, "BackgroundColor3", "Stroke"); ln.Parent = Page
-        end
-        function Tab:CreateLabel(text)
-            order += 1
-            local L = Label(Page, text or "", 12, "SubText", FONT); L.TextWrapped = true; L.TextTruncate = Enum.TextTruncate.None
-            L.Size = UDim2.new(1, -8, 0, 0); L.AutomaticSize = Enum.AutomaticSize.Y; L.LayoutOrder = order
-            Win.Elements[#Win.Elements + 1] = { Frame = L, Key = string.lower(text or "") }
-            return { Set = function(_, t) L.Text = t; L.TextXAlignment = Align(t) end }
-        end
-        function Tab:CreateParagraph(c)
-            c = c or {}; order += 1
-            local F = Instance.new("Frame"); F.Size = UDim2.new(1, 0, 0, 0); F.AutomaticSize = Enum.AutomaticSize.Y
-            F.BorderSizePixel = 0; F.LayoutOrder = order; Th(F, "BackgroundColor3", "Card"); F.Parent = Page
-            Corner(F, 8); Stroke(F, "Stroke", 1); Pad(F, 12, 10, 12, 10)
-            local ly = Instance.new("UIListLayout"); ly.Padding = UDim.new(0, 3); ly.SortOrder = Enum.SortOrder.LayoutOrder; ly.Parent = F
-            local function mk(t, sz, k, f, o)
-                local l = Label(F, t, sz, k, f); l.TextWrapped = true; l.TextTruncate = Enum.TextTruncate.None
-                l.Size = UDim2.new(1, 0, 0, 0); l.AutomaticSize = Enum.AutomaticSize.Y; l.LayoutOrder = o; return l
-            end
-            local a, b = mk(c.Title or "", 13, "Text", FONTB, 1), mk(c.Content or "", 12, "SubText", FONT, 2)
-            Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower((c.Title or "") .. " " .. (c.Content or "")) }
-            return { Set = function(_, d) a.Text = d.Title or a.Text; b.Text = d.Content or b.Text
-                a.TextXAlignment = Align(a.Text); b.TextXAlignment = Align(b.Text) end }
-        end
-
-        -- ===== Button =====
-        function Tab:CreateButton(c)
-            c = c or {}
-            local F, L = Base(c, { clickable = true, rightW = 20 })
-            local A = Label(F, ">", 14, "SubText", FONTB, Enum.TextXAlignment.Center); A.AnchorPoint = Vector2.new(1, .5)
-            A.Position = UDim2.new(1, -8, .5, 0); A.Size = UDim2.fromOffset(16, 20)
-            F.Activated:Connect(function()
-                Tw(F, { BackgroundColor3 = T.Accent }, .08)
-                task.delay(.1, function() Tw(F, { BackgroundColor3 = T.Card }, .25) end)
-                task.spawn(Safe, c.Callback)
-            end)
-            return { Set = function(_, t) L.Text = t; L.TextXAlignment = Align(t) end, Fire = function() task.spawn(Safe, c.Callback) end }
-        end
-
-        -- ===== Toggle =====
-        function Tab:CreateToggle(c)
-            c = c or {}
-            local flag = c.Flag or c.Name or "Toggle"
-            local F = Base(c, { clickable = true, rightW = 56 })
-            local Sw = Instance.new("Frame"); Sw.AnchorPoint = Vector2.new(1, .5); Sw.Position = UDim2.new(1, -12, .5, 0)
-            Sw.Size = UDim2.fromOffset(42, 22); Sw.BorderSizePixel = 0; Sw.Parent = F; Corner(Sw, 11)
-            local Kn = Instance.new("Frame"); Kn.AnchorPoint = Vector2.new(0, .5); Kn.Size = UDim2.fromOffset(16, 16)
-            Kn.BorderSizePixel = 0; Kn.BackgroundColor3 = Color3.new(1, 1, 1); Kn.Parent = Sw; Corner(Kn, 8)
-            local state = c.Default == true
-            local function Paint(anim)
-                local d = anim and .18 or 0
-                Tw(Sw, { BackgroundColor3 = state and T.Accent or T.SwitchOff }, d)
-                Tw(Kn, { Position = state and UDim2.new(1, -19, .5, 0) or UDim2.new(0, 3, .5, 0) }, d)
-            end
-            Paint(false); Hook(function() Paint(false) end)
-            SetFlag(flag, state, true)
-            local ctrl = {}
-            function ctrl:Set(v, silent)
-                state = v == true; Paint(true); SetFlag(flag, state)
-                if not silent then task.spawn(Safe, c.Callback, state) end
-            end
-            function ctrl:Get() return state end
-            F.Activated:Connect(function() ctrl:Set(not state) end)
-            Reg(flag, ctrl, c)
-            return ctrl
-        end
-
-        -- ===== Slider =====
-        function Tab:CreateSlider(c)
-            c = c or {}
-            local flag = c.Flag or c.Name or "Slider"
-            local min, max = c.Min or 0, c.Max or 100
-            if max <= min then max = min + 1 end
-            local inc = c.Increment or 1
-            local suffix = c.Suffix or ""
-            local dec = #((tostring(inc):match("%.(%d+)")) or "")
-            local F = Base(c, { rightW = 76, extra = 16 })
-            local function Fmt(v) return (dec > 0 and string.format("%." .. dec .. "f", v) or tostring(v)) .. suffix end
-            local value = math.clamp(c.Default or min, min, max)
-            local VL = Label(F, Fmt(value), 12, "Accent", FONTB, Enum.TextXAlignment.Right)
-            VL.AnchorPoint = Vector2.new(1, 0); VL.Position = UDim2.new(1, -12, 0, 6); VL.Size = UDim2.fromOffset(70, 18)
-            local Hit = Instance.new("TextButton"); Hit.BackgroundTransparency = 1; Hit.Text = ""; Hit.AutoButtonColor = false
-            Hit.AnchorPoint = Vector2.new(0, 1); Hit.Position = UDim2.new(0, 12, 1, -4); Hit.Size = UDim2.new(1, -24, 0, 26); Hit.Parent = F
-            local Bar = Instance.new("Frame"); Bar.AnchorPoint = Vector2.new(0, .5); Bar.Position = UDim2.fromScale(0, .5)
-            Bar.Size = UDim2.new(1, 0, 0, 8); Bar.BorderSizePixel = 0; Th(Bar, "BackgroundColor3", "SwitchOff"); Bar.Parent = Hit; Corner(Bar, 4)
-            local Fill = Instance.new("Frame"); Fill.BorderSizePixel = 0; Th(Fill, "BackgroundColor3", "Accent"); Fill.Parent = Bar; Corner(Fill, 4)
-            local Kn = Instance.new("Frame"); Kn.AnchorPoint = Vector2.new(.5, .5); Kn.Position = UDim2.fromScale(1, .5)
-            Kn.Size = UDim2.fromOffset(16, 16); Kn.BorderSizePixel = 0; Kn.BackgroundColor3 = Color3.new(1, 1, 1); Kn.Parent = Fill
-            Corner(Kn, 8); Stroke(Kn, "Accent", 2)
-            local function Visual(anim)
-                VL.Text = Fmt(value)
-                Tw(Fill, { Size = UDim2.new((value - min) / (max - min), 0, 1, 0) }, anim and .15 or 0)
-            end
-            Visual(false); SetFlag(flag, value, true)
-            local function Norm(v)
-                v = min + math.floor((v - min) / inc + .5) * inc
-                v = math.clamp(v, min, max)
-                return tonumber(string.format("%." .. dec .. "f", v)) or v
-            end
-            local ctrl = {}
-            function ctrl:Set(v, silent)
-                v = Norm(tonumber(v) or min)
-                local changed = v ~= value
-                value = v; Visual(true); SetFlag(flag, value)
-                if changed and not silent then task.spawn(Safe, c.Callback, value) end
-            end
-            function ctrl:Get() return value end
-            PointerDrag(Hit, Page, function(pos)
-                local a = math.clamp((pos.X - Hit.AbsolutePosition.X) / math.max(1, Hit.AbsoluteSize.X), 0, 1)
-                local v = Norm(min + (max - min) * a)
-                if v ~= value then
-                    value = v; Visual(false); SetFlag(flag, value)
-                    task.spawn(Safe, c.Callback, value)
+        -- Helper to attach controls to either the main tab Page or a Column container
+        local function BuildControls(targetParent, targetWidth, targetObj, isCol)
+            local order = 0
+            local function Base(c, o)
+                o = o or {}
+                order += 1
+                local nm = c.Name or "Element"
+                local desc = c.Desc or c.Description
+                local hasDesc = desc ~= nil and desc ~= ""
+                local rightW, extra = o.rightW or 0, o.extra or 0
+                local textW = targetWidth - 24 - rightW
+                local h, dh = 38, 0
+                if hasDesc then dh = Measure(desc, 11, math.max(40, textW)); h = 26 + dh + 8 end
+                h += extra
+                local stack = hasDesc or extra > 0
+                local F = Instance.new(o.clickable and "TextButton" or "Frame")
+                F.Name = nm; F.Size = UDim2.new(1, 0, 0, h); F.BorderSizePixel = 0; F.LayoutOrder = order
+                Th(F, "BackgroundColor3", "Card")
+                if o.clickable then F.Text = ""; F.AutoButtonColor = false end
+                F.Parent = targetParent; Corner(F, 8); Stroke(F, "Stroke", 1)
+                local L = Label(F, nm, 13, "Text", FONT)
+                L.Position = UDim2.fromOffset(12, stack and 6 or 0)
+                L.Size = stack and UDim2.new(1, -(24 + rightW), 0, 18) or UDim2.new(1, -(24 + rightW), 1, 0)
+                local D
+                if hasDesc then
+                    D = Label(F, desc, 11, "SubText", FONT); D.TextWrapped = true; D.TextTruncate = Enum.TextTruncate.None
+                    D.TextYAlignment = Enum.TextYAlignment.Top; D.Position = UDim2.fromOffset(12, 26)
+                    D.Size = UDim2.new(1, -(24 + rightW), 0, dh)
                 end
-            end)
-            Reg(flag, ctrl, c)
-            return ctrl
+                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower(nm .. " " .. (desc or "")) }
+                if o.clickable then
+                    F.MouseEnter:Connect(function() Tw(F, { BackgroundColor3 = T.CardHover }, .12) end)
+                    F.MouseLeave:Connect(function() Tw(F, { BackgroundColor3 = T.Card }, .12) end)
+                end
+                return F, L, D
+            end
+
+            local function Reg(flag, ctrl, c)
+                Lib.Registry[flag] = function(v) ctrl:Set(v) end
+                if c.NoSave then Lib.NoSave[flag] = true end
+            end
+
+            function targetObj:CreateSection(text)
+                order += 1
+                local F = Instance.new("Frame"); F.BackgroundTransparency = 1; F.Size = UDim2.new(1, 0, 0, 26); F.LayoutOrder = order; F.Parent = targetParent
+                local L = Label(F, text or "SECTION", 12, "Accent", FONTB); L.Position = UDim2.fromOffset(4, 0); L.Size = UDim2.new(1, -8, 0, 22)
+                local ln = Instance.new("Frame"); ln.Size = UDim2.new(1, 0, 0, 1); ln.Position = UDim2.new(0, 0, 1, -2); ln.BorderSizePixel = 0
+                Th(ln, "BackgroundColor3", "Stroke"); ln.Parent = F
+                return { Set = function(_, t) L.Text = t; L.TextXAlignment = Align(t) end }
+            end
+
+            function targetObj:CreateDivider()
+                order += 1
+                local ln = Instance.new("Frame"); ln.Size = UDim2.new(1, 0, 0, 1); ln.BorderSizePixel = 0; ln.LayoutOrder = order
+                Th(ln, "BackgroundColor3", "Stroke"); ln.Parent = targetParent
+            end
+
+            function targetObj:CreateLabel(text)
+                order += 1
+                local L = Label(targetParent, text or "", 12, "SubText", FONT); L.TextWrapped = true; L.TextTruncate = Enum.TextTruncate.None
+                L.Size = UDim2.new(1, -8, 0, 0); L.AutomaticSize = Enum.AutomaticSize.Y; L.LayoutOrder = order
+                Win.Elements[#Win.Elements + 1] = { Frame = L, Key = string.lower(text or "") }
+                return { Set = function(_, t) L.Text = t; L.TextXAlignment = Align(t) end }
+            end
+
+            function targetObj:CreateParagraph(c)
+                c = c or {}; order += 1
+                local F = Instance.new("Frame"); F.Size = UDim2.new(1, 0, 0, 0); F.AutomaticSize = Enum.AutomaticSize.Y
+                F.BorderSizePixel = 0; F.LayoutOrder = order; Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent
+                Corner(F, 8); Stroke(F, "Stroke", 1); Pad(F, 12, 10, 12, 10)
+                local ly = Instance.new("UIListLayout"); ly.Padding = UDim.new(0, 3); ly.SortOrder = Enum.SortOrder.LayoutOrder; ly.Parent = F
+                local function mk(t, sz, k, f, o)
+                    local l = Label(F, t, sz, k, f); l.TextWrapped = true; l.TextTruncate = Enum.TextTruncate.None
+                    l.Size = UDim2.new(1, 0, 0, 0); l.AutomaticSize = Enum.AutomaticSize.Y; l.LayoutOrder = o; return l
+                end
+                local a, b = mk(c.Title or "", 13, "Text", FONTB, 1), mk(c.Content or "", 12, "SubText", FONT, 2)
+                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower((c.Title or "") .. " " .. (c.Content or "")) }
+                return { Set = function(_, d) a.Text = d.Title or a.Text; b.Text = d.Content or b.Text
+                    a.TextXAlignment = Align(a.Text); b.TextXAlignment = Align(b.Text) end }
+            end
+
+            function targetObj:CreateButton(c)
+                c = c or {}
+                local F, L = Base(c, { clickable = true, rightW = 20 })
+                local A = Label(F, ">", 14, "SubText", FONTB, Enum.TextXAlignment.Center); A.AnchorPoint = Vector2.new(1, .5)
+                A.Position = UDim2.new(1, -8, .5, 0); A.Size = UDim2.fromOffset(16, 20)
+                F.Activated:Connect(function()
+                    Tw(F, { BackgroundColor3 = T.Accent }, .08)
+                    task.delay(.1, function() Tw(F, { BackgroundColor3 = T.Card }, .25) end)
+                    task.spawn(Safe, c.Callback)
+                end)
+                return { Set = function(_, t) L.Text = t; L.TextXAlignment = Align(t) end, Fire = function() task.spawn(Safe, c.Callback) end }
+            end
+
+            function targetObj:CreateToggle(c)
+                c = c or {}
+                local flag = c.Flag or c.Name or "Toggle"
+                local F = Base(c, { clickable = true, rightW = 56 })
+                local Sw = Instance.new("Frame"); Sw.AnchorPoint = Vector2.new(1, .5); Sw.Position = UDim2.new(1, -12, .5, 0)
+                Sw.Size = UDim2.fromOffset(42, 22); Sw.BorderSizePixel = 0; Sw.Parent = F; Corner(Sw, 11)
+                local Kn = Instance.new("Frame"); Kn.AnchorPoint = Vector2.new(0, .5); Kn.Size = UDim2.fromOffset(16, 16)
+                Kn.BorderSizePixel = 0; Kn.BackgroundColor3 = Color3.new(1, 1, 1); Kn.Parent = Sw; Corner(Kn, 8)
+                local state = c.Default == true
+                local function Paint(anim)
+                    local d = anim and .18 or 0
+                    Tw(Sw, { BackgroundColor3 = state and T.Accent or T.SwitchOff }, d)
+                    Tw(Kn, { Position = state and UDim2.new(1, -19, .5, 0) or UDim2.new(0, 3, .5, 0) }, d)
+                end
+                Paint(false); Hook(function() Paint(false) end)
+                SetFlag(flag, state, true)
+                local ctrl = {}
+                function ctrl:Set(v, silent)
+                    state = v == true; Paint(true); SetFlag(flag, state)
+                    if not silent then task.spawn(Safe, c.Callback, state) end
+                end
+                function ctrl:Get() return state end
+                F.Activated:Connect(function() ctrl:Set(not state) end)
+                Reg(flag, ctrl, c)
+                return ctrl
+            end
+
+            function targetObj:CreateSlider(c)
+                c = c or {}
+                local flag = c.Flag or c.Name or "Slider"
+                local min, max = c.Min or 0, c.Max or 100
+                if max <= min then max = min + 1 end
+                local inc = c.Increment or 1
+                local suffix = c.Suffix or ""
+                local dec = #((tostring(inc):match("%.(%d+)")) or "")
+                local F = Base(c, { rightW = 76, extra = 16 })
+                local function Fmt(v) return (dec > 0 and string.format("%." .. dec .. "f", v) or tostring(v)) .. suffix end
+                local value = math.clamp(c.Default or min, min, max)
+                local VL = Label(F, Fmt(value), 12, "Accent", FONTB, Enum.TextXAlignment.Right)
+                VL.AnchorPoint = Vector2.new(1, 0); VL.Position = UDim2.new(1, -12, 0, 6); VL.Size = UDim2.fromOffset(70, 18)
+                local Hit = Instance.new("TextButton"); Hit.BackgroundTransparency = 1; Hit.Text = ""; Hit.AutoButtonColor = false
+                Hit.AnchorPoint = Vector2.new(0, 1); Hit.Position = UDim2.new(0, 12, 1, -4); Hit.Size = UDim2.new(1, -24, 0, 26); Hit.Parent = F
+                local Bar = Instance.new("Frame"); Bar.AnchorPoint = Vector2.new(0, .5); Bar.Position = UDim2.fromScale(0, .5)
+                Bar.Size = UDim2.new(1, 0, 0, 8); Bar.BorderSizePixel = 0; Th(Bar, "BackgroundColor3", "SwitchOff"); Bar.Parent = Hit; Corner(Bar, 4)
+                local Fill = Instance.new("Frame"); Fill.BorderSizePixel = 0; Th(Fill, "BackgroundColor3", "Accent"); Fill.Parent = Bar; Corner(Fill, 4)
+                local Kn = Instance.new("Frame"); Kn.AnchorPoint = Vector2.new(.5, .5); Kn.Position = UDim2.fromScale(1, .5)
+                Kn.Size = UDim2.fromOffset(16, 16); Kn.BorderSizePixel = 0; Kn.BackgroundColor3 = Color3.new(1, 1, 1); Kn.Parent = Fill
+                Corner(Kn, 8); Stroke(Kn, "Accent", 2)
+                local function Visual(anim)
+                    VL.Text = Fmt(value)
+                    Tw(Fill, { Size = UDim2.new((value - min) / (max - min), 0, 1, 0) }, anim and .15 or 0)
+                end
+                Visual(false); SetFlag(flag, value, true)
+                local function Norm(v)
+                    v = min + math.floor((v - min) / inc + .5) * inc
+                    v = math.clamp(v, min, max)
+                    return tonumber(string.format("%." .. dec .. "f", v)) or v
+                end
+                local ctrl = {}
+                function ctrl:Set(v, silent)
+                    v = Norm(tonumber(v) or min)
+                    local changed = v ~= value
+                    value = v; Visual(true); SetFlag(flag, value)
+                    if changed and not silent then task.spawn(Safe, c.Callback, value) end
+                end
+                function ctrl:Get() return value end
+                PointerDrag(Hit, Page, function(pos)
+                    local a = math.clamp((pos.X - Hit.AbsolutePosition.X) / math.max(1, Hit.AbsoluteSize.X), 0, 1)
+                    local v = Norm(min + (max - min) * a)
+                    if v ~= value then
+                        value = v; Visual(false); SetFlag(flag, value)
+                        task.spawn(Safe, c.Callback, value)
+                    end
+                end)
+                Reg(flag, ctrl, c)
+                return ctrl
+            end
+
+            -- [Bug 2 Fixed]: FocusLost properly receives `enterPressed` and persists on Mobile
+            function targetObj:CreateInput(c)
+                c = c or {}
+                local flag = c.Flag or c.Name or "Input"
+                local inW = isCol and math.clamp(targetWidth * 0.45, 60, 110) or 148
+                local F = Base(c, { rightW = inW + 12 })
+                local TB = Instance.new("TextBox"); TB.AnchorPoint = Vector2.new(1, .5); TB.Position = UDim2.new(1, -8, .5, 0)
+                TB.Size = UDim2.fromOffset(inW, 26); TB.BorderSizePixel = 0; TB.Text = c.Default or ""; TB.TextSize = 12; TB.Font = FONT
+                TB.PlaceholderText = c.Placeholder or "Enter..."; TB.ClearTextOnFocus = false; TB.TextTruncate = Enum.TextTruncate.AtEnd
+                Th(TB, "BackgroundColor3", "Sidebar"); Th(TB, "TextColor3", "Text"); Th(TB, "PlaceholderColor3", "SubText")
+                TB.Parent = F; Corner(TB, 6); Stroke(TB, "Stroke", 1)
+                SetFlag(flag, TB.Text, true)
+                local ctrl = {}
+                function ctrl:Set(t, silent)
+                    t = tostring(t); TB.Text = t; SetFlag(flag, t)
+                    if not silent then task.spawn(Safe, c.Callback, t, false) end
+                end
+                function ctrl:Get() return TB.Text end
+                Conn(TB.FocusLost, function(enterPressed)
+                    local t = TB.Text
+                    if c.NumbersOnly then t = tostring(tonumber(t) or ""); TB.Text = t end
+                    SetFlag(flag, t); task.spawn(Safe, c.Callback, t, enterPressed)
+                    if c.RemoveTextAfterFocusLost then TB.Text = "" end
+                end)
+                Reg(flag, ctrl, c)
+                return ctrl
+            end
+
+            -- [Bug 3 Fixed]: ScrollingDirection locked to Y for reliable mobile scrolling
+            function targetObj:CreateDropdown(c)
+                c = c or {}
+                order += 1
+                local nm = c.Name or "Dropdown"
+                local flag = c.Flag or nm
+                local options = c.Options or {}
+                local multi = c.Multi == true
+                local selected, current = {}, nil
+                if multi then for _, v in ipairs(type(c.Default) == "table" and c.Default or {}) do selected[v] = true end
+                else current = c.Default or options[1] end
+
+                local Cont = Instance.new("Frame"); Cont.Name = nm; Cont.Size = UDim2.new(1, 0, 0, 38); Cont.ClipsDescendants = true
+                Cont.BorderSizePixel = 0; Cont.LayoutOrder = order; Th(Cont, "BackgroundColor3", "Card"); Cont.Parent = targetParent
+                Corner(Cont, 8); Stroke(Cont, "Stroke", 1)
+                Win.Elements[#Win.Elements + 1] = { Frame = Cont, Key = string.lower(nm) }
+                local Head = Instance.new("TextButton"); Head.BackgroundTransparency = 1; Head.Text = ""; Head.Size = UDim2.new(1, 0, 0, 38); Head.Parent = Cont
+                local NL = Label(Head, nm, 13, "Text", FONT); NL.Position = UDim2.fromOffset(12, 0); NL.Size = UDim2.new(.5, -12, 1, 0)
+                local VL = Label(Head, "", 12, "Accent", FONTB, Enum.TextXAlignment.Right); VL.AnchorPoint = Vector2.new(1, .5)
+                VL.Position = UDim2.new(1, -30, .5, 0); VL.Size = UDim2.new(.5, -40, 1, 0)
+                local Ar = Label(Head, "▼", 10, "SubText", FONT, Enum.TextXAlignment.Center); Ar.AnchorPoint = Vector2.new(1, .5)
+                Ar.Position = UDim2.new(1, -8, .5, 0); Ar.Size = UDim2.fromOffset(18, 18)
+                local List = Instance.new("ScrollingFrame"); List.BackgroundTransparency = 1; List.BorderSizePixel = 0
+                List.Position = UDim2.fromOffset(8, 42); List.ScrollBarThickness = 2; List.CanvasSize = UDim2.new()
+                List.AutomaticCanvasSize = Enum.AutomaticSize.Y
+                List.ScrollingDirection = Enum.ScrollingDirection.Y -- Mobile touch-scroll guaranteed
+                Th(List, "ScrollBarImageColor3", "Accent"); List.Parent = Cont
+                local LL = Instance.new("UIListLayout"); LL.Padding = UDim.new(0, 3); LL.SortOrder = Enum.SortOrder.LayoutOrder; LL.Parent = List
+
+                local open, btns = false, {}
+                local function ListH() return math.min(#options, 5) * 31 end
+                local function OpenH() return 38 + 4 + ListH() + 8 end
+                local function Resize() List.Size = UDim2.new(1, -16, 0, ListH()); if open then Tw(Cont, { Size = UDim2.new(1, 0, 0, OpenH()) }, .2) end end
+                local function Display()
+                    if multi then
+                        local t = {}; for _, o in ipairs(options) do if selected[o] then t[#t + 1] = tostring(o) end end
+                        VL.Text = #t > 0 and table.concat(t, ", ") or "None"
+                    else VL.Text = current ~= nil and tostring(current) or "None" end
+                end
+                local function Value()
+                    if multi then local t = {}; for _, o in ipairs(options) do if selected[o] then t[#t + 1] = o end end return t end
+                    return current
+                end
+                local function PaintOpts()
+                    for o, b in pairs(btns) do
+                        local on = multi and selected[o] or (not multi and current == o)
+                        Tw(b, { BackgroundColor3 = on and T.Accent or T.Sidebar, TextColor3 = on and Color3.new(1, 1, 1) or T.SubText }, .15)
+                    end
+                end
+                local ctrl = {}
+                local function Fire(silent)
+                    SetFlag(flag, Value()); Display(); PaintOpts()
+                    if not silent then task.spawn(Safe, c.Callback, Value()) end
+                end
+                local function Build()
+                    for _, ch in ipairs(List:GetChildren()) do if ch:IsA("TextButton") then ch:Destroy() end end
+                    btns = {}
+                    for i, o in ipairs(options) do
+                        local b = Instance.new("TextButton"); b.Size = UDim2.new(1, 0, 0, 28); b.BorderSizePixel = 0; b.LayoutOrder = i
+                        b.AutoButtonColor = false; b.Text = tostring(o); b.TextSize = 12; b.Font = FONT
+                        b.TextXAlignment = Align(tostring(o)); Pad(b, 10, 0, 10, 0)
+                        b.BackgroundColor3 = T.Sidebar; b.TextColor3 = T.SubText; b.Parent = List; Corner(b, 6)
+                        btns[o] = b
+                        b.Activated:Connect(function()
+                            if multi then selected[o] = not selected[o] or nil
+                            else current = o; open = false; Ar.Text = "▼"; Tw(Cont, { Size = UDim2.new(1, 0, 0, 38) }, .2) end
+                            Fire(false)
+                        end)
+                    end
+                    Resize(); Display(); PaintOpts()
+                end
+                Build(); Hook(PaintOpts)
+                SetFlag(flag, Value(), true)
+                Head.Activated:Connect(function()
+                    open = not open; Ar.Text = open and "▲" or "▼"
+                    Tw(Cont, { Size = UDim2.new(1, 0, 0, open and OpenH() or 38) }, .2)
+                end)
+                function ctrl:Set(v, silent)
+                    if multi then
+                        selected = {}; for _, x in ipairs(type(v) == "table" and v or { v }) do selected[x] = true end
+                    else current = v end
+                    Fire(silent)
+                end
+                function ctrl:Get() return Value() end
+                function ctrl:Refresh(newOpts, keep)
+                    options = newOpts or {}
+                    if keep then
+                        if multi then for k in pairs(selected) do if not table.find(options, k) then selected[k] = nil end end
+                        elseif not table.find(options, current) then current = options[1] end
+                    else selected = {}; current = options[1] end
+                    Build(); SetFlag(flag, Value())
+                end
+                Reg(flag, ctrl, c)
+                return ctrl
+            end
+
+            function targetObj:CreateKeybind(c)
+                c = c or {}
+                local flag = c.Flag or c.Name or "Keybind"
+                local touch = UIS.TouchEnabled
+                local F = Base(c, { rightW = touch and 150 or 124 })
+                local def = c.Default or "E"
+                local key = typeof(def) == "EnumItem" and def.Name or tostring(def)
+                local mode = c.Mode == "Hold" and "Hold" or "Toggle"
+                local listening, holding, on = false, false, false
+
+                local function SmallBtn(txt, w, x)
+                    local b = Instance.new("TextButton"); b.AnchorPoint = Vector2.new(1, .5); b.Position = UDim2.new(1, x, .5, 0)
+                    b.Size = UDim2.fromOffset(w, 26); b.Text = txt; b.TextSize = 11; b.Font = FONTB; b.AutoButtonColor = false
+                    b.BorderSizePixel = 0; Th(b, "BackgroundColor3", "Sidebar"); Th(b, "TextColor3", "Accent"); b.Parent = F; Corner(b, 6)
+                    return b
+                end
+                local KB = SmallBtn(key, 60, -8)
+                local MB = SmallBtn(mode == "Toggle" and "TG" or "HD", 32, -74)
+                if touch then
+                    local RB = SmallBtn("▶", 28, -112)
+                    RB.Activated:Connect(function() on = not on; task.spawn(Safe, c.Callback, on, key) end)
+                end
+                SetFlag(flag, { Key = key, Mode = mode }, true)
+                local function Store() SetFlag(flag, { Key = key, Mode = mode }) end
+                MB.Activated:Connect(function()
+                    mode = mode == "Toggle" and "Hold" or "Toggle"; MB.Text = mode == "Toggle" and "TG" or "HD"; Store()
+                    Win:Notify({ Title = "Keybind", Content = (c.Name or "Keybind") .. ": " .. mode, Duration = 1.5 })
+                end)
+                KB.Activated:Connect(function() listening = true; KB.Text = "..." end)
+                Conn(UIS.InputBegan, function(i, gpe)
+                    if i.UserInputType ~= Enum.UserInputType.Keyboard then return end
+                    if listening then
+                        listening = false
+                        if i.KeyCode == Enum.KeyCode.Escape then
+                        elseif i.KeyCode == Enum.KeyCode.Backspace then key = "None"
+                        else key = i.KeyCode.Name end
+                        KB.Text = key; Store(); return
+                    end
+                    if gpe or key == "None" or i.KeyCode.Name ~= key then return end
+                    if mode == "Toggle" then on = not on; task.spawn(Safe, c.Callback, on, key)
+                    elseif not holding then holding = true; task.spawn(Safe, c.Callback, true, key) end
+                end)
+                Conn(UIS.InputEnded, function(i)
+                    if mode == "Hold" and holding and i.UserInputType == Enum.UserInputType.Keyboard and i.KeyCode.Name == key then
+                        holding = false; task.spawn(Safe, c.Callback, false, key)
+                    end
+                end)
+                local ctrl = {}
+                function ctrl:Set(v)
+                    if type(v) == "table" then key = tostring(v.Key or key); mode = v.Mode == "Hold" and "Hold" or "Toggle"
+                    else key = typeof(v) == "EnumItem" and v.Name or tostring(v) end
+                    KB.Text = key; MB.Text = mode == "Toggle" and "TG" or "HD"; Store()
+                end
+                function ctrl:Get() return key, mode end
+                Reg(flag, ctrl, c)
+                return ctrl
+            end
+
+            function targetObj:CreateColorPicker(c)
+                c = c or {}
+                order += 1
+                local nm = c.Name or "Color"
+                local flag = c.Flag or nm
+                local color = c.Default or T.Accent
+                local h, s, v = color:ToHSV()
+                local open = false
+                local Cont = Instance.new("Frame"); Cont.Name = nm; Cont.Size = UDim2.new(1, 0, 0, 38); Cont.ClipsDescendants = true
+                Cont.BorderSizePixel = 0; Cont.LayoutOrder = order; Th(Cont, "BackgroundColor3", "Card"); Cont.Parent = targetParent
+                Corner(Cont, 8); Stroke(Cont, "Stroke", 1)
+                Win.Elements[#Win.Elements + 1] = { Frame = Cont, Key = string.lower(nm) }
+                local Head = Instance.new("TextButton"); Head.BackgroundTransparency = 1; Head.Text = ""; Head.Size = UDim2.new(1, 0, 0, 38); Head.Parent = Cont
+                local NL = Label(Head, nm, 13, "Text", FONT); NL.Position = UDim2.fromOffset(12, 0); NL.Size = UDim2.new(1, -110, 1, 0)
+                local Hex = Label(Head, "", 11, "SubText", FONT, Enum.TextXAlignment.Right); Hex.AnchorPoint = Vector2.new(1, .5)
+                Hex.Position = UDim2.new(1, -46, .5, 0); Hex.Size = UDim2.fromOffset(60, 18)
+                local Prev = Instance.new("Frame"); Prev.AnchorPoint = Vector2.new(1, .5); Prev.Position = UDim2.new(1, -10, .5, 0)
+                Prev.Size = UDim2.fromOffset(30, 20); Prev.BorderSizePixel = 0; Prev.Parent = Head; Corner(Prev, 6); Stroke(Prev, "Stroke", 1)
+
+                local SV = Instance.new("Frame"); SV.Position = UDim2.fromOffset(10, 44); SV.Size = UDim2.new(1, -20, 0, 90)
+                SV.BorderSizePixel = 0; SV.ClipsDescendants = true; SV.Parent = Cont; Corner(SV, 6)
+                local White = Instance.new("Frame"); White.Size = UDim2.fromScale(1, 1); White.BorderSizePixel = 0
+                White.BackgroundColor3 = Color3.new(1, 1, 1); White.Parent = SV
+                local g1 = Instance.new("UIGradient"); g1.Transparency = NumberSequence.new(0, 1); g1.Parent = White
+                local Black = Instance.new("Frame"); Black.Size = UDim2.fromScale(1, 1); Black.BorderSizePixel = 0
+                Black.BackgroundColor3 = Color3.new(0, 0, 0); Black.Parent = SV
+                local g2 = Instance.new("UIGradient"); g2.Rotation = 90; g2.Transparency = NumberSequence.new(1, 0); g2.Parent = Black
+                local SVC = Instance.new("Frame"); SVC.AnchorPoint = Vector2.new(.5, .5); SVC.Size = UDim2.fromOffset(12, 12)
+                SVC.BackgroundTransparency = 1; SVC.Parent = SV; Corner(SVC, 6)
+                local cs = Instance.new("UIStroke"); cs.Color = Color3.new(1, 1, 1); cs.Thickness = 2; cs.Parent = SVC
+
+                local HB = Instance.new("Frame"); HB.Position = UDim2.fromOffset(10, 142); HB.Size = UDim2.new(1, -20, 0, 14)
+                HB.BorderSizePixel = 0; HB.BackgroundColor3 = Color3.new(1, 1, 1); HB.Parent = Cont; Corner(HB, 7)
+                local hg = Instance.new("UIGradient"); hg.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromHSV(0, 1, 1)), ColorSequenceKeypoint.new(.167, Color3.fromHSV(.167, 1, 1)),
+                    ColorSequenceKeypoint.new(.333, Color3.fromHSV(.333, 1, 1)), ColorSequenceKeypoint.new(.5, Color3.fromHSV(.5, 1, 1)),
+                    ColorSequenceKeypoint.new(.667, Color3.fromHSV(.667, 1, 1)), ColorSequenceKeypoint.new(.833, Color3.fromHSV(.833, 1, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.fromHSV(1, 1, 1)) }); hg.Parent = HB
+                local HC = Instance.new("Frame"); HC.AnchorPoint = Vector2.new(.5, .5); HC.Size = UDim2.fromOffset(6, 20)
+                HC.BackgroundColor3 = Color3.new(1, 1, 1); HC.BorderSizePixel = 0; HC.Parent = HB; Corner(HC, 3)
+                local hs = Instance.new("UIStroke"); hs.Color = Color3.new(0, 0, 0); hs.Transparency = .5; hs.Parent = HC
+
+                local function Visual()
+                    color = Color3.fromHSV(h, s, v)
+                    Prev.BackgroundColor3 = color; SV.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+                    SVC.Position = UDim2.fromScale(s, 1 - v); HC.Position = UDim2.fromScale(h, .5)
+                    Hex.Text = "#" .. color:ToHex():upper()
+                end
+                Visual(); SetFlag(flag, color, true)
+                local function Fire(silent) Visual(); SetFlag(flag, color); if not silent then task.spawn(Safe, c.Callback, color) end end
+                PointerDrag(SV, Page, function(p)
+                    s = math.clamp((p.X - SV.AbsolutePosition.X) / math.max(1, SV.AbsoluteSize.X), 0, 1)
+                    v = 1 - math.clamp((p.Y - SV.AbsolutePosition.Y) / math.max(1, SV.AbsoluteSize.Y), 0, 1); Fire(false)
+                end)
+                PointerDrag(HB, Page, function(p)
+                    h = math.clamp((p.X - HB.AbsolutePosition.X) / math.max(1, HB.AbsoluteSize.X), 0, 1); Fire(false)
+                end)
+                Head.Activated:Connect(function() open = not open; Tw(Cont, { Size = UDim2.new(1, 0, 0, open and 168 or 38) }, .2) end)
+                local ctrl = {}
+                function ctrl:Set(col, silent)
+                    if typeof(col) ~= "Color3" then return end
+                    h, s, v = col:ToHSV(); Fire(silent)
+                end
+                function ctrl:Get() return color end
+                Reg(flag, ctrl, c)
+                return ctrl
+            end
+
+            function targetObj:CreateConfigSection()
+                targetObj:CreateSection("Settings  |  الإعدادات")
+                local slot = "Slot1"
+                targetObj:CreateDropdown({ Name = "Config Slot | الحافظة", Options = { "Slot1", "Slot2", "Slot3" }, Default = "Slot1",
+                    NoSave = true, Callback = function(x) slot = x end })
+                targetObj:CreateButton({ Name = "Save Config | حفظ", Desc = "Save current settings to the selected slot.", Callback = function() Win:SaveConfig(slot) end })
+                targetObj:CreateButton({ Name = "Load Config | استرجاع", Desc = "Load settings from the selected slot.", Callback = function() Win:LoadConfig(slot) end })
+                targetObj:CreateButton({ Name = "Delete Config | حذف", Callback = function() Win:DeleteConfig(slot) end })
+                local names = {}; for k in pairs(Themes) do names[#names + 1] = k end; table.sort(names)
+                targetObj:CreateDropdown({ Name = "Theme | المظهر", Options = names, Default = cfg.Theme or "Dark", NoSave = false,
+                    Flag = "__Theme", Callback = function(x) Win:SetTheme(x) end })
+                targetObj:CreateButton({ Name = "Destroy UI | إغلاق", Callback = function() Win:Destroy() end })
+            end
         end
 
-        -- ===== Input =====
-        function Tab:CreateInput(c)
-            c = c or {}
-            local flag = c.Flag or c.Name or "Input"
-            local F = Base(c, { rightW = 160 })
-            local TB = Instance.new("TextBox"); TB.AnchorPoint = Vector2.new(1, .5); TB.Position = UDim2.new(1, -8, .5, 0)
-            TB.Size = UDim2.fromOffset(148, 26); TB.BorderSizePixel = 0; TB.Text = c.Default or ""; TB.TextSize = 12; TB.Font = FONT
-            TB.PlaceholderText = c.Placeholder or "Enter..."; TB.ClearTextOnFocus = false; TB.TextTruncate = Enum.TextTruncate.AtEnd
-            Th(TB, "BackgroundColor3", "Sidebar"); Th(TB, "TextColor3", "Text"); Th(TB, "PlaceholderColor3", "SubText")
-            TB.Parent = F; Corner(TB, 6); Stroke(TB, "Stroke", 1)
-            SetFlag(flag, TB.Text, true)
-            local ctrl = {}
-            function ctrl:Set(t, silent)
-                t = tostring(t); TB.Text = t; SetFlag(flag, t)
-                if not silent then task.spawn(Safe, c.Callback, t) end
-            end
-            function ctrl:Get() return TB.Text end
-            Conn(TB.FocusLost, function()
-                local t = TB.Text
-                if c.NumbersOnly then t = tostring(tonumber(t) or ""); TB.Text = t end
-                SetFlag(flag, t); task.spawn(Safe, c.Callback, t)
-                if c.RemoveTextAfterFocusLost then TB.Text = "" end
-            end)
-            Reg(flag, ctrl, c)
-            return ctrl
-        end
+        -- Build standard controls on the tab's main page
+        BuildControls(Page, PAGE_W, Tab, false)
 
-        -- ===== Dropdown (single / multi / refresh) =====
-        function Tab:CreateDropdown(c)
-            c = c or {}
-            order += 1
-            local nm = c.Name or "Dropdown"
-            local flag = c.Flag or nm
-            local options = c.Options or {}
-            local multi = c.Multi == true
-            local selected, current = {}, nil
-            if multi then for _, v in ipairs(type(c.Default) == "table" and c.Default or {}) do selected[v] = true end
-            else current = c.Default or options[1] end
+        -- ---------- [Feature 3 Added]: Multi-Column Layout ----------
+        local layoutOrder = 0
+        function Tab:CreateColumnLayout(cols)
+            cols = math.max(1, tonumber(cols) or 2)
+            layoutOrder += 1
 
-            local Cont = Instance.new("Frame"); Cont.Name = nm; Cont.Size = UDim2.new(1, 0, 0, 38); Cont.ClipsDescendants = true
-            Cont.BorderSizePixel = 0; Cont.LayoutOrder = order; Th(Cont, "BackgroundColor3", "Card"); Cont.Parent = Page
-            Corner(Cont, 8); Stroke(Cont, "Stroke", 1)
-            Win.Elements[#Win.Elements + 1] = { Frame = Cont, Key = string.lower(nm) }
-            local Head = Instance.new("TextButton"); Head.BackgroundTransparency = 1; Head.Text = ""; Head.Size = UDim2.new(1, 0, 0, 38); Head.Parent = Cont
-            local NL = Label(Head, nm, 13, "Text", FONT); NL.Position = UDim2.fromOffset(12, 0); NL.Size = UDim2.new(.5, -12, 1, 0)
-            local VL = Label(Head, "", 12, "Accent", FONTB, Enum.TextXAlignment.Right); VL.AnchorPoint = Vector2.new(1, .5)
-            VL.Position = UDim2.new(1, -30, .5, 0); VL.Size = UDim2.new(.5, -40, 1, 0)
-            local Ar = Label(Head, "▼", 10, "SubText", FONT, Enum.TextXAlignment.Center); Ar.AnchorPoint = Vector2.new(1, .5)
-            Ar.Position = UDim2.new(1, -8, .5, 0); Ar.Size = UDim2.fromOffset(18, 18)
-            local List = Instance.new("ScrollingFrame"); List.BackgroundTransparency = 1; List.BorderSizePixel = 0
-            List.Position = UDim2.fromOffset(8, 42); List.ScrollBarThickness = 2; List.CanvasSize = UDim2.new()
-            List.AutomaticCanvasSize = Enum.AutomaticSize.Y; Th(List, "ScrollBarImageColor3", "Accent"); List.Parent = Cont
-            local LL = Instance.new("UIListLayout"); LL.Padding = UDim.new(0, 3); LL.SortOrder = Enum.SortOrder.LayoutOrder; LL.Parent = List
+            local Container = Instance.new("Frame")
+            Container.Name = "ColumnRow_" .. layoutOrder
+            Container.BackgroundTransparency = 1
+            Container.Size = UDim2.new(1, 0, 0, 0)
+            Container.AutomaticSize = Enum.AutomaticSize.Y
+            Container.LayoutOrder = layoutOrder
+            Container.BorderSizePixel = 0
+            Container.Parent = Page
 
-            local open, btns = false, {}
-            local function ListH() return math.min(#options, 5) * 31 end
-            local function OpenH() return 38 + 4 + ListH() + 8 end
-            local function Resize() List.Size = UDim2.new(1, -16, 0, ListH()); if open then Tw(Cont, { Size = UDim2.new(1, 0, 0, OpenH()) }, .2) end end
-            local function Display()
-                if multi then
-                    local t = {}; for _, o in ipairs(options) do if selected[o] then t[#t + 1] = tostring(o) end end
-                    VL.Text = #t > 0 and table.concat(t, ", ") or "None"
-                else VL.Text = current ~= nil and tostring(current) or "None" end
+            local RowLayout = Instance.new("UIListLayout")
+            RowLayout.FillDirection = Enum.FillDirection.Horizontal
+            RowLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            RowLayout.Padding = UDim.new(0, 6)
+            RowLayout.Parent = Container
+
+            local padTotal = (cols - 1) * 6
+            local colWidthOffset = math.floor(padTotal / cols)
+            local singleColW = math.floor((PAGE_W - padTotal) / cols)
+
+            local LayoutProxy = {}
+            local ColList = {}
+            local nextCol = 1
+
+            for i = 1, cols do
+                local ColFrame = Instance.new("Frame")
+                ColFrame.Name = "Col_" .. i
+                ColFrame.BackgroundTransparency = 1
+                ColFrame.Size = UDim2.new(1 / cols, -colWidthOffset, 0, 0)
+                ColFrame.AutomaticSize = Enum.AutomaticSize.Y
+                ColFrame.BorderSizePixel = 0
+                ColFrame.LayoutOrder = i
+                ColFrame.Parent = Container
+
+                local CL = Instance.new("UIListLayout")
+                CL.Padding = UDim.new(0, 6)
+                CL.SortOrder = Enum.SortOrder.LayoutOrder
+                CL.Parent = ColFrame
+
+                local ColObj = {}
+                BuildControls(ColFrame, singleColW, ColObj, true)
+                ColList[i] = ColObj
+                LayoutProxy[i] = ColObj
             end
-            local function Value()
-                if multi then local t = {}; for _, o in ipairs(options) do if selected[o] then t[#t + 1] = o end end return t end
-                return current
-            end
-            local function PaintOpts()
-                for o, b in pairs(btns) do
-                    local on = multi and selected[o] or (not multi and current == o)
-                    Tw(b, { BackgroundColor3 = on and T.Accent or T.Sidebar, TextColor3 = on and Color3.new(1, 1, 1) or T.SubText }, .15)
+
+            -- Proxies all elements for round-robin auto-distribution
+            local methods = {
+                "CreateSection", "CreateDivider", "CreateLabel", "CreateParagraph",
+                "CreateButton", "CreateToggle", "CreateSlider", "CreateInput",
+                "CreateDropdown", "CreateKeybind", "CreateColorPicker"
+            }
+            for _, m in ipairs(methods) do
+                LayoutProxy[m] = function(_, ...)
+                    local target = ColList[nextCol]
+                    nextCol = (nextCol % cols) + 1
+                    return target[m](target, ...)
                 end
             end
-            local ctrl = {}
-            local function Fire(silent)
-                SetFlag(flag, Value()); Display(); PaintOpts()
-                if not silent then task.spawn(Safe, c.Callback, Value()) end
-            end
-            local function Build()
-                for _, ch in ipairs(List:GetChildren()) do if ch:IsA("TextButton") then ch:Destroy() end end
-                btns = {}
-                for i, o in ipairs(options) do
-                    local b = Instance.new("TextButton"); b.Size = UDim2.new(1, 0, 0, 28); b.BorderSizePixel = 0; b.LayoutOrder = i
-                    b.AutoButtonColor = false; b.Text = tostring(o); b.TextSize = 12; b.Font = FONT
-                    b.TextXAlignment = Align(tostring(o)); Pad(b, 10, 0, 10, 0)
-                    b.BackgroundColor3 = T.Sidebar; b.TextColor3 = T.SubText; b.Parent = List; Corner(b, 6)
-                    btns[o] = b
-                    b.Activated:Connect(function()
-                        if multi then selected[o] = not selected[o] or nil
-                        else current = o; open = false; Ar.Text = "▼"; Tw(Cont, { Size = UDim2.new(1, 0, 0, 38) }, .2) end
-                        Fire(false)
-                    end)
-                end
-                Resize(); Display(); PaintOpts()
-            end
-            Build(); Hook(PaintOpts)
-            SetFlag(flag, Value(), true)
-            Head.Activated:Connect(function()
-                open = not open; Ar.Text = open and "▲" or "▼"
-                Tw(Cont, { Size = UDim2.new(1, 0, 0, open and OpenH() or 38) }, .2)
-            end)
-            function ctrl:Set(v, silent)
-                if multi then
-                    selected = {}; for _, x in ipairs(type(v) == "table" and v or { v }) do selected[x] = true end
-                else current = v end
-                Fire(silent)
-            end
-            function ctrl:Get() return Value() end
-            function ctrl:Refresh(newOpts, keep)
-                options = newOpts or {}
-                if keep then
-                    if multi then for k in pairs(selected) do if not table.find(options, k) then selected[k] = nil end end
-                    elseif not table.find(options, current) then current = options[1] end
-                else selected = {}; current = options[1] end
-                Build(); SetFlag(flag, Value())
-            end
-            Reg(flag, ctrl, c)
-            return ctrl
-        end
 
-        -- ===== Keybind (Toggle / Hold) =====
-        function Tab:CreateKeybind(c)
-            c = c or {}
-            local flag = c.Flag or c.Name or "Keybind"
-            local touch = UIS.TouchEnabled
-            local F = Base(c, { rightW = touch and 150 or 124 })
-            local def = c.Default or "E"
-            local key = typeof(def) == "EnumItem" and def.Name or tostring(def)
-            local mode = c.Mode == "Hold" and "Hold" or "Toggle"
-            local listening, holding, on = false, false, false
-
-            local function SmallBtn(txt, w, x)
-                local b = Instance.new("TextButton"); b.AnchorPoint = Vector2.new(1, .5); b.Position = UDim2.new(1, x, .5, 0)
-                b.Size = UDim2.fromOffset(w, 26); b.Text = txt; b.TextSize = 11; b.Font = FONTB; b.AutoButtonColor = false
-                b.BorderSizePixel = 0; Th(b, "BackgroundColor3", "Sidebar"); Th(b, "TextColor3", "Accent"); b.Parent = F; Corner(b, 6)
-                return b
-            end
-            local KB = SmallBtn(key, 60, -8)
-            local MB = SmallBtn(mode == "Toggle" and "TG" or "HD", 32, -74)
-            if touch then
-                local RB = SmallBtn("▶", 28, -112)
-                RB.Activated:Connect(function() on = not on; task.spawn(Safe, c.Callback, on, key) end)
-            end
-            SetFlag(flag, { Key = key, Mode = mode }, true)
-            local function Store() SetFlag(flag, { Key = key, Mode = mode }) end
-            MB.Activated:Connect(function()
-                mode = mode == "Toggle" and "Hold" or "Toggle"; MB.Text = mode == "Toggle" and "TG" or "HD"; Store()
-                Win:Notify({ Title = "Keybind", Content = (c.Name or "Keybind") .. ": " .. mode, Duration = 1.5 })
-            end)
-            KB.Activated:Connect(function() listening = true; KB.Text = "..." end)
-            Conn(UIS.InputBegan, function(i, gpe)
-                if i.UserInputType ~= Enum.UserInputType.Keyboard then return end
-                if listening then
-                    listening = false
-                    if i.KeyCode == Enum.KeyCode.Escape then -- cancel
-                    elseif i.KeyCode == Enum.KeyCode.Backspace then key = "None"
-                    else key = i.KeyCode.Name end
-                    KB.Text = key; Store(); return
-                end
-                if gpe or key == "None" or i.KeyCode.Name ~= key then return end
-                if mode == "Toggle" then on = not on; task.spawn(Safe, c.Callback, on, key)
-                elseif not holding then holding = true; task.spawn(Safe, c.Callback, true, key) end
-            end)
-            Conn(UIS.InputEnded, function(i)
-                if mode == "Hold" and holding and i.UserInputType == Enum.UserInputType.Keyboard and i.KeyCode.Name == key then
-                    holding = false; task.spawn(Safe, c.Callback, false, key)
-                end
-            end)
-            local ctrl = {}
-            function ctrl:Set(v)
-                if type(v) == "table" then key = tostring(v.Key or key); mode = v.Mode == "Hold" and "Hold" or "Toggle"
-                else key = typeof(v) == "EnumItem" and v.Name or tostring(v) end
-                KB.Text = key; MB.Text = mode == "Toggle" and "TG" or "HD"; Store()
-            end
-            function ctrl:Get() return key, mode end
-            Reg(flag, ctrl, c)
-            return ctrl
-        end
-
-        -- ===== Color picker (HSV) =====
-        function Tab:CreateColorPicker(c)
-            c = c or {}
-            order += 1
-            local nm = c.Name or "Color"
-            local flag = c.Flag or nm
-            local color = c.Default or T.Accent
-            local h, s, v = color:ToHSV()
-            local open = false
-            local Cont = Instance.new("Frame"); Cont.Name = nm; Cont.Size = UDim2.new(1, 0, 0, 38); Cont.ClipsDescendants = true
-            Cont.BorderSizePixel = 0; Cont.LayoutOrder = order; Th(Cont, "BackgroundColor3", "Card"); Cont.Parent = Page
-            Corner(Cont, 8); Stroke(Cont, "Stroke", 1)
-            Win.Elements[#Win.Elements + 1] = { Frame = Cont, Key = string.lower(nm) }
-            local Head = Instance.new("TextButton"); Head.BackgroundTransparency = 1; Head.Text = ""; Head.Size = UDim2.new(1, 0, 0, 38); Head.Parent = Cont
-            local NL = Label(Head, nm, 13, "Text", FONT); NL.Position = UDim2.fromOffset(12, 0); NL.Size = UDim2.new(1, -110, 1, 0)
-            local Hex = Label(Head, "", 11, "SubText", FONT, Enum.TextXAlignment.Right); Hex.AnchorPoint = Vector2.new(1, .5)
-            Hex.Position = UDim2.new(1, -46, .5, 0); Hex.Size = UDim2.fromOffset(60, 18)
-            local Prev = Instance.new("Frame"); Prev.AnchorPoint = Vector2.new(1, .5); Prev.Position = UDim2.new(1, -10, .5, 0)
-            Prev.Size = UDim2.fromOffset(30, 20); Prev.BorderSizePixel = 0; Prev.Parent = Head; Corner(Prev, 6); Stroke(Prev, "Stroke", 1)
-
-            local SV = Instance.new("Frame"); SV.Position = UDim2.fromOffset(10, 44); SV.Size = UDim2.new(1, -20, 0, 90)
-            SV.BorderSizePixel = 0; SV.ClipsDescendants = true; SV.Parent = Cont; Corner(SV, 6)
-            local White = Instance.new("Frame"); White.Size = UDim2.fromScale(1, 1); White.BorderSizePixel = 0
-            White.BackgroundColor3 = Color3.new(1, 1, 1); White.Parent = SV
-            local g1 = Instance.new("UIGradient"); g1.Transparency = NumberSequence.new(0, 1); g1.Parent = White
-            local Black = Instance.new("Frame"); Black.Size = UDim2.fromScale(1, 1); Black.BorderSizePixel = 0
-            Black.BackgroundColor3 = Color3.new(0, 0, 0); Black.Parent = SV
-            local g2 = Instance.new("UIGradient"); g2.Rotation = 90; g2.Transparency = NumberSequence.new(1, 0); g2.Parent = Black
-            local SVC = Instance.new("Frame"); SVC.AnchorPoint = Vector2.new(.5, .5); SVC.Size = UDim2.fromOffset(12, 12)
-            SVC.BackgroundTransparency = 1; SVC.Parent = SV; Corner(SVC, 6)
-            local cs = Instance.new("UIStroke"); cs.Color = Color3.new(1, 1, 1); cs.Thickness = 2; cs.Parent = SVC
-
-            local HB = Instance.new("Frame"); HB.Position = UDim2.fromOffset(10, 142); HB.Size = UDim2.new(1, -20, 0, 14)
-            HB.BorderSizePixel = 0; HB.BackgroundColor3 = Color3.new(1, 1, 1); HB.Parent = Cont; Corner(HB, 7)
-            local hg = Instance.new("UIGradient"); hg.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.fromHSV(0, 1, 1)), ColorSequenceKeypoint.new(.167, Color3.fromHSV(.167, 1, 1)),
-                ColorSequenceKeypoint.new(.333, Color3.fromHSV(.333, 1, 1)), ColorSequenceKeypoint.new(.5, Color3.fromHSV(.5, 1, 1)),
-                ColorSequenceKeypoint.new(.667, Color3.fromHSV(.667, 1, 1)), ColorSequenceKeypoint.new(.833, Color3.fromHSV(.833, 1, 1)),
-                ColorSequenceKeypoint.new(1, Color3.fromHSV(1, 1, 1)) }); hg.Parent = HB
-            local HC = Instance.new("Frame"); HC.AnchorPoint = Vector2.new(.5, .5); HC.Size = UDim2.fromOffset(6, 20)
-            HC.BackgroundColor3 = Color3.new(1, 1, 1); HC.BorderSizePixel = 0; HC.Parent = HB; Corner(HC, 3)
-            local hs = Instance.new("UIStroke"); hs.Color = Color3.new(0, 0, 0); hs.Transparency = .5; hs.Parent = HC
-
-            local function Visual()
-                color = Color3.fromHSV(h, s, v)
-                Prev.BackgroundColor3 = color; SV.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-                SVC.Position = UDim2.fromScale(s, 1 - v); HC.Position = UDim2.fromScale(h, .5)
-                Hex.Text = "#" .. color:ToHex():upper()
-            end
-            Visual(); SetFlag(flag, color, true)
-            local function Fire(silent) Visual(); SetFlag(flag, color); if not silent then task.spawn(Safe, c.Callback, color) end end
-            PointerDrag(SV, Page, function(p)
-                s = math.clamp((p.X - SV.AbsolutePosition.X) / math.max(1, SV.AbsoluteSize.X), 0, 1)
-                v = 1 - math.clamp((p.Y - SV.AbsolutePosition.Y) / math.max(1, SV.AbsoluteSize.Y), 0, 1); Fire(false)
-            end)
-            PointerDrag(HB, Page, function(p)
-                h = math.clamp((p.X - HB.AbsolutePosition.X) / math.max(1, HB.AbsoluteSize.X), 0, 1); Fire(false)
-            end)
-            Head.Activated:Connect(function() open = not open; Tw(Cont, { Size = UDim2.new(1, 0, 0, open and 168 or 38) }, .2) end)
-            local ctrl = {}
-            function ctrl:Set(col, silent)
-                if typeof(col) ~= "Color3" then return end
-                h, s, v = col:ToHSV(); Fire(silent)
-            end
-            function ctrl:Get() return color end
-            Reg(flag, ctrl, c)
-            return ctrl
-        end
-
-        -- ===== Ready-made settings block =====
-        function Tab:CreateConfigSection()
-            Tab:CreateSection("Settings  |  الإعدادات")
-            local slot = "Slot1"
-            Tab:CreateDropdown({ Name = "Config Slot | الحافظة", Options = { "Slot1", "Slot2", "Slot3" }, Default = "Slot1",
-                NoSave = true, Callback = function(x) slot = x end })
-            Tab:CreateButton({ Name = "Save Config | حفظ", Desc = "Save current settings to the selected slot.", Callback = function() Win:SaveConfig(slot) end })
-            Tab:CreateButton({ Name = "Load Config | استرجاع", Desc = "Load settings from the selected slot.", Callback = function() Win:LoadConfig(slot) end })
-            Tab:CreateButton({ Name = "Delete Config | حذف", Callback = function() Win:DeleteConfig(slot) end })
-            local names = {}; for k in pairs(Themes) do names[#names + 1] = k end; table.sort(names)
-            Tab:CreateDropdown({ Name = "Theme | المظهر", Options = names, Default = cfg.Theme or "Dark", NoSave = false,
-                Flag = "__Theme", Callback = function(x) Win:SetTheme(x) end })
-            Tab:CreateButton({ Name = "Destroy UI | إغلاق", Callback = function() Win:Destroy() end })
+            -- Allows indexing as table `Cols[1]`, aliases `Cols.Col1`, or unpacking `local C1, C2 = unpack(Cols)`
+            LayoutProxy.Col1 = ColList[1]
+            LayoutProxy.Col2 = ColList[2]
+            LayoutProxy.Col3 = ColList[3]
+            return LayoutProxy
         end
 
         Win.Tabs[#Win.Tabs + 1] = Tab
@@ -1016,22 +1097,3 @@ function Lib:CreateWindow(cfg)
 end
 
 return Lib
-
---[[ ---------------------------- EXAMPLE ----------------------------
-local Aura = loadstring(game:HttpGet("YOUR_RAW_URL"))()
-local Win = Aura:CreateWindow({
-    Title = "My Hub", Subtitle = "v1.0", Theme = "Dark", ToggleUIKeybind = "RightShift",
-    ConfigurationSaving = { Enabled = true, FolderName = "MyHub", FileName = "Auto" }, -- autosave + autoload
-    -- KeySystem = { Key = {"abc123"}, SaveKey = true, Note = "Get key from our server" },
-})
-local Main = Win:CreateTab("Main")
-Main:CreateSection("Player")
-Main:CreateToggle({ Name = "Speed", Desc = "Boost walk speed", Callback = function(on) end })
-Main:CreateSlider({ Name = "WalkSpeed", Min = 16, Max = 200, Default = 16, Suffix = " st", Callback = function(v) end })
-Main:CreateDropdown({ Name = "Targets", Options = {"A","B","C"}, Multi = true, Callback = function(list) end })
-Main:CreateColorPicker({ Name = "ESP Color", Default = Color3.fromRGB(255,0,0), Callback = function(c) end })
-Main:CreateKeybind({ Name = "Fly", Default = "F", Mode = "Toggle", Callback = function(on) end })
-Win:CreateTab("Settings"):CreateConfigSection()
-Win:CreateWatermark("My Hub")
-Win:Notify({ Title = "Loaded", Content = "Welcome!", Type = "Success" })
-------------------------------------------------------------------- ]]
