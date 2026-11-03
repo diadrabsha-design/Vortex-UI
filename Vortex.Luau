@@ -1,15 +1,14 @@
 --[[ ======================================================================
-    AURA LUXE v4.2  |  Apex Mobile Edition (Delta / Codex / Arceus 2026)
-    - Full Original Feature-Set Restored (HSV Picker, Keybinds, KeyGate, Configs)
-    - 99% Screen Blur + High-Speed Blinking Neon White Loader
-    - Stepped Loading: 30% (0.5s) -> 30% (0.4s) -> 40% (0.6s) with "" targets
-    - 0.54334s Drop Animation (Top to Center) at Maximum Refresh Rate
-    - Compact Sizing + Near-Sharp Corners (3px) + Seamless Borders
+    AURA LUXE v5.0  |  Rayfield Gen2 Apex Edition (Mobile / PC 2026)
+    - Full Rayfield & Rayfield Gen2 Compatibility (Groups, Flags, KeySystem, Discord)
+    - Complete AuraLuxe Feature-Set (DynamicLabel, PlayerCard, PlayerList, SubTabs, etc.)
+    - Multi-Directional Nested Groups (Row / Column Grids)
+    - Dual Sidebar / Topbar Sectioning Engine
+    - Lucide & Roblox Asset Icon Resolver
+    - Stepped Neon White Loader & 99% Blur Transition
     - Anti-Jump Relative Drag Engine (Touch & Mouse Certified)
-    - NEW: DynamicLabel, PlayerCard, PlayerList, SubTabs, ProgressBar,
-           TextArea, ImageButton, CustomFrame, Multi/Search Dropdown,
-           Resizable Window, Suffix/Increment Sliders, Image/Type Notifications,
-           Unified API (Set, Get, SetVisible, Destroy, SetText, SetImage).
+    - Notifications with Action Buttons & Discord Integration
+    - Unified API: Set(), Get(), SetVisible(), Destroy(), Refresh(), SetText()
     ====================================================================== ]]
 
 local cloneref = cloneref or function(o) return o end
@@ -29,52 +28,57 @@ local Workspace   = Svc("Workspace")
 local Lighting    = Svc("Lighting")
 local LocalPlayer = Players.LocalPlayer
 
--- ======================= Themes =======================
+-- ======================= Lucide & Asset Icon Resolver =======================
+local LucideIcons = {
+    home = "rbxassetid://10723407389", settings = "rbxassetid://10734950309",
+    user = "rbxassetid://10747373176", users = "rbxassetid://10747373434",
+    bell = "rbxassetid://10709752044", search = "rbxassetid://10734890000",
+    folder = "rbxassetid://10723387563", file = "rbxassetid://10723374641",
+    shield = "rbxassetid://10734951847", sword = "rbxassetid://10734975486",
+    crosshair = "rbxassetid://10709769841", terminal = "rbxassetid://10734982144",
+    code = "rbxassetid://10709810463", sliders = "rbxassetid://10734963471",
+    info = "rbxassetid://10723415903", check = "rbxassetid://10709767827",
+    x = "rbxassetid://10747384394", alert = "rbxassetid://10709751935",
+    lock = "rbxassetid://10723434791", unlock = "rbxassetid://10747372992",
+    key = "rbxassetid://10723424505", eye = "rbxassetid://10723356507",
+    zap = "rbxassetid://10747386885", play = "rbxassetid://10734923549",
+    layers = "rbxassetid://10723425539", grid = "rbxassetid://10723395285",
+    discord = "rbxassetid://10709775082", download = "rbxassetid://10723354521",
+    trash = "rbxassetid://10747362014", refresh = "rbxassetid://10734934532"
+}
+
+local function ResolveIcon(ic)
+    if not ic then return nil end
+    if typeof(ic) == "number" then return "rbxassetid://" .. tostring(ic) end
+    local str = tostring(ic)
+    if str:match("^%d+$") then return "rbxassetid://" .. str end
+    if str:sub(1, 10) == "rbxasset://" or str:sub(1, 12) == "rbxassetid://" or str:sub(1, 4) == "http" then
+        return str
+    end
+    local low = str:lower():gsub("%s+", "")
+    if LucideIcons[low] then return LucideIcons[low] end
+    return nil
+end
+
+-- ======================= Themes Engine =======================
 local Themes = {
+    Default = {
+        Background = Color3.fromRGB(15, 15, 18), Header = Color3.fromRGB(22, 22, 26),
+        Sidebar = Color3.fromRGB(18, 18, 22), Card = Color3.fromRGB(25, 25, 30),
+        CardHover = Color3.fromRGB(34, 34, 42), Stroke = Color3.fromRGB(35, 35, 42),
+        Accent = Color3.fromRGB(56, 114, 255), Accent2 = Color3.fromRGB(99, 102, 241),
+        Text = Color3.fromRGB(240, 240, 245), SubText = Color3.fromRGB(145, 150, 165),
+        Success = Color3.fromRGB(52, 211, 153), Danger = Color3.fromRGB(239, 68, 68),
+        Warn = Color3.fromRGB(245, 158, 11), SwitchOff = Color3.fromRGB(38, 38, 48),
+    },
     Dark = {
         Background = Color3.fromRGB(12, 12, 15), Header = Color3.fromRGB(16, 16, 20),
         Sidebar = Color3.fromRGB(10, 10, 13), Card = Color3.fromRGB(18, 18, 22),
-        CardHover = Color3.fromRGB(24, 24, 30), Stroke = Color3.fromRGB(14, 14, 18),
+        CardHover = Color3.fromRGB(24, 24, 30), Stroke = Color3.fromRGB(26, 26, 32),
         Accent = Color3.fromRGB(99, 102, 241), Accent2 = Color3.fromRGB(139, 92, 246),
         Text = Color3.fromRGB(245, 245, 248), SubText = Color3.fromRGB(135, 140, 150),
         Success = Color3.fromRGB(52, 211, 153), Danger = Color3.fromRGB(239, 68, 68),
         Warn = Color3.fromRGB(245, 158, 11), SwitchOff = Color3.fromRGB(30, 30, 36),
-    },
-    Ocean = {
-        Background = Color3.fromRGB(8, 14, 22), Header = Color3.fromRGB(12, 20, 32),
-        Sidebar = Color3.fromRGB(6, 11, 18), Card = Color3.fromRGB(14, 24, 38),
-        CardHover = Color3.fromRGB(20, 34, 52), Stroke = Color3.fromRGB(10, 16, 26),
-        Accent = Color3.fromRGB(14, 165, 233), Accent2 = Color3.fromRGB(20, 184, 166),
-        Text = Color3.fromRGB(240, 248, 255), SubText = Color3.fromRGB(130, 150, 175),
-        Success = Color3.fromRGB(52, 211, 153), Danger = Color3.fromRGB(239, 68, 68),
-        Warn = Color3.fromRGB(245, 158, 11), SwitchOff = Color3.fromRGB(26, 42, 64),
-    },
-    Rose = {
-        Background = Color3.fromRGB(18, 12, 15), Header = Color3.fromRGB(26, 16, 21),
-        Sidebar = Color3.fromRGB(14, 9, 12), Card = Color3.fromRGB(30, 18, 24),
-        CardHover = Color3.fromRGB(42, 24, 34), Stroke = Color3.fromRGB(20, 13, 17),
-        Accent = Color3.fromRGB(244, 63, 94), Accent2 = Color3.fromRGB(251, 146, 60),
-        Text = Color3.fromRGB(255, 242, 245), SubText = Color3.fromRGB(175, 135, 145),
-        Success = Color3.fromRGB(52, 211, 153), Danger = Color3.fromRGB(239, 68, 68),
-        Warn = Color3.fromRGB(245, 158, 11), SwitchOff = Color3.fromRGB(55, 34, 44),
-    },
-    Emerald = {
-        Background = Color3.fromRGB(9, 16, 14), Header = Color3.fromRGB(13, 24, 20),
-        Sidebar = Color3.fromRGB(7, 12, 11), Card = Color3.fromRGB(16, 28, 24),
-        CardHover = Color3.fromRGB(22, 38, 32), Stroke = Color3.fromRGB(11, 18, 16),
-        Accent = Color3.fromRGB(16, 185, 129), Accent2 = Color3.fromRGB(132, 204, 22),
-        Text = Color3.fromRGB(240, 253, 245), SubText = Color3.fromRGB(130, 160, 145),
-        Success = Color3.fromRGB(52, 211, 153), Danger = Color3.fromRGB(239, 68, 68),
-        Warn = Color3.fromRGB(245, 158, 11), SwitchOff = Color3.fromRGB(30, 50, 44),
-    },
-    Onyx = {
-        Background = Color3.fromRGB(8, 8, 10), Header = Color3.fromRGB(12, 12, 14),
-        Sidebar = Color3.fromRGB(6, 6, 8), Card = Color3.fromRGB(15, 15, 18),
-        CardHover = Color3.fromRGB(22, 22, 26), Stroke = Color3.fromRGB(10, 10, 12),
-        Accent = Color3.fromRGB(255, 255, 255), Accent2 = Color3.fromRGB(180, 180, 190),
-        Text = Color3.fromRGB(255, 255, 255), SubText = Color3.fromRGB(130, 130, 135),
-        Success = Color3.fromRGB(50, 200, 120), Danger = Color3.fromRGB(230, 60, 60),
-        Warn = Color3.fromRGB(240, 160, 20), SwitchOff = Color3.fromRGB(25, 25, 30),
     },
     Light = {
         Background = Color3.fromRGB(240, 242, 247), Header = Color3.fromRGB(255, 255, 255),
@@ -84,15 +88,51 @@ local Themes = {
         Text = Color3.fromRGB(20, 24, 35), SubText = Color3.fromRGB(100, 112, 134),
         Success = Color3.fromRGB(16, 185, 129), Danger = Color3.fromRGB(239, 68, 68),
         Warn = Color3.fromRGB(245, 158, 11), SwitchOff = Color3.fromRGB(200, 206, 220),
+    },
+    Ocean = {
+        Background = Color3.fromRGB(8, 14, 22), Header = Color3.fromRGB(12, 20, 32),
+        Sidebar = Color3.fromRGB(6, 11, 18), Card = Color3.fromRGB(14, 24, 38),
+        CardHover = Color3.fromRGB(20, 34, 52), Stroke = Color3.fromRGB(18, 30, 48),
+        Accent = Color3.fromRGB(14, 165, 233), Accent2 = Color3.fromRGB(20, 184, 166),
+        Text = Color3.fromRGB(240, 248, 255), SubText = Color3.fromRGB(130, 150, 175),
+        Success = Color3.fromRGB(52, 211, 153), Danger = Color3.fromRGB(239, 68, 68),
+        Warn = Color3.fromRGB(245, 158, 11), SwitchOff = Color3.fromRGB(26, 42, 64),
+    },
+    Rose = {
+        Background = Color3.fromRGB(18, 12, 15), Header = Color3.fromRGB(26, 16, 21),
+        Sidebar = Color3.fromRGB(14, 9, 12), Card = Color3.fromRGB(30, 18, 24),
+        CardHover = Color3.fromRGB(42, 24, 34), Stroke = Color3.fromRGB(36, 22, 29),
+        Accent = Color3.fromRGB(244, 63, 94), Accent2 = Color3.fromRGB(251, 146, 60),
+        Text = Color3.fromRGB(255, 242, 245), SubText = Color3.fromRGB(175, 135, 145),
+        Success = Color3.fromRGB(52, 211, 153), Danger = Color3.fromRGB(239, 68, 68),
+        Warn = Color3.fromRGB(245, 158, 11), SwitchOff = Color3.fromRGB(55, 34, 44),
+    },
+    Emerald = {
+        Background = Color3.fromRGB(9, 16, 14), Header = Color3.fromRGB(13, 24, 20),
+        Sidebar = Color3.fromRGB(7, 12, 11), Card = Color3.fromRGB(16, 28, 24),
+        CardHover = Color3.fromRGB(22, 38, 32), Stroke = Color3.fromRGB(20, 36, 30),
+        Accent = Color3.fromRGB(16, 185, 129), Accent2 = Color3.fromRGB(132, 204, 22),
+        Text = Color3.fromRGB(240, 253, 245), SubText = Color3.fromRGB(130, 160, 145),
+        Success = Color3.fromRGB(52, 211, 153), Danger = Color3.fromRGB(239, 68, 68),
+        Warn = Color3.fromRGB(245, 158, 11), SwitchOff = Color3.fromRGB(30, 50, 44),
+    },
+    Onyx = {
+        Background = Color3.fromRGB(8, 8, 10), Header = Color3.fromRGB(12, 12, 14),
+        Sidebar = Color3.fromRGB(6, 6, 8), Card = Color3.fromRGB(15, 15, 18),
+        CardHover = Color3.fromRGB(22, 22, 26), Stroke = Color3.fromRGB(24, 24, 28),
+        Accent = Color3.fromRGB(255, 255, 255), Accent2 = Color3.fromRGB(180, 180, 190),
+        Text = Color3.fromRGB(255, 255, 255), SubText = Color3.fromRGB(130, 130, 135),
+        Success = Color3.fromRGB(50, 200, 120), Danger = Color3.fromRGB(230, 60, 60),
+        Warn = Color3.fromRGB(240, 160, 20), SwitchOff = Color3.fromRGB(25, 25, 30),
     }
 }
 
 local T = {}
 local Bound, Hooks = {}, {}
-for k, v in pairs(Themes.Dark) do T[k] = v end
+for k, v in pairs(Themes.Default) do T[k] = v end
 
 local FONT, FONTB = Enum.Font.GothamMedium, Enum.Font.GothamBold
-local Lib = { Version = "4.2", Flags = {}, Registry = {}, NoSave = {}, Themes = Themes, _wins = {} }
+local Lib = { Version = "5.0", Flags = {}, Registry = {}, NoSave = {}, Themes = Themes, _wins = {} }
 
 -- ======================= Core Helpers =======================
 local function Th(inst, prop, key) inst[prop] = T[key]; Bound[#Bound + 1] = { inst, prop, key } end
@@ -138,7 +178,7 @@ local function Align(s) return IsArabic(s) and Enum.TextXAlignment.Right or Enum
 local function Safe(cb, ...)
     if typeof(cb) ~= "function" then return end
     local ok, err = pcall(cb, ...)
-    if not ok then warn("[AuraLuxe] Error: " .. tostring(err)) end
+    if not ok then warn("[AuraLuxe Gen2] Error: " .. tostring(err)) end
 end
 
 local function IsPointer(i)
@@ -164,10 +204,33 @@ local function SafeParent()
     return LocalPlayer:WaitForChild("PlayerGui")
 end
 
+local function RequestHttp(url)
+    local fn = (syn and syn.request) or (http and http.request) or http_request or request
+    if fn then
+        local res = fn({ Url = url, Method = "GET" })
+        if res and res.Body then return res.Body end
+    end
+    local ok, res = pcall(function() return game:HttpGet(url) end)
+    return ok and res or nil
+end
+
 local function ApplyTheme(src, anim)
-    src = type(src) == "table" and src or Themes[src]
-    if not src then return false end
-    for k, v in pairs(Themes.Dark) do T[k] = src[k] or v end
+    if type(src) == "string" then src = Themes[src] end
+    if type(src) ~= "table" then return false end
+
+    -- Rayfield Theme Properties Mapping
+    local mapped = {}
+    mapped.Background = src.Background or src.BackgroundColor3
+    mapped.Header     = src.Topbar or src.Header or src.HeaderColor
+    mapped.Sidebar    = src.Sidebar or src.SidebarColor
+    mapped.Card       = src.Card or src.CardColor or src.ElementColor
+    mapped.CardHover  = src.CardHover or src.ElementHoverColor
+    mapped.Stroke     = src.Stroke or src.BorderColor or src.OutlineColor
+    mapped.Accent     = src.Accent or src.AccentColor
+    mapped.Text       = src.Text or src.TextColor
+    mapped.SubText    = src.SubText or src.PlaceholderColor or src.DescriptionColor
+
+    for k, v in pairs(Themes.Default) do T[k] = mapped[k] or src[k] or v end
     for _, b in ipairs(Bound) do
         if b[1].Parent then Tw(b[1], { [b[2]] = T[b[3]] }, anim == false and 0 or 0.2) end
     end
@@ -182,6 +245,7 @@ local function Encode(v)
     if type(v) == "table" then local o = {}; for k, x in pairs(v) do o[k] = Encode(x) end return o end
     return v
 end
+
 local function Decode(v)
     if type(v) == "table" then
         if v.__t == "C3" then return Color3.new(v.R, v.G, v.B) end
@@ -190,14 +254,35 @@ local function Decode(v)
     return v
 end
 
--- ======================= KeyGate System =======================
+-- ======================= Advanced Rayfield KeyGate System =======================
 local function KeyGate(ks, parent)
-    local keys = type(ks.Key) == "table" and ks.Key or { ks.Key }
-    local file = ks.SaveKey and (ks.FileName or "AuraLuxe/key.txt")
+    local keys = {}
+    if type(ks.Key) == "table" then
+        for _, k in ipairs(ks.Key) do keys[#keys + 1] = tostring(k) end
+    elseif ks.Key then
+        keys[1] = tostring(ks.Key)
+    end
+
+    if ks.GrabKeyFromSite then
+        local rawUrl = (type(ks.Key) == "string" and ks.Key) or (type(ks.Key) == "table" and ks.Key[1]) or ks.URL
+        if rawUrl and (rawUrl:find("http://") or rawUrl:find("https://")) then
+            local fetched = RequestHttp(rawUrl)
+            if fetched then
+                for line in fetched:gmatch("[^\r\n]+") do
+                    local clean = line:match("^%s*(.-)%s*$")
+                    if clean and #clean > 0 then keys[#keys + 1] = clean end
+                end
+            end
+        end
+    end
+
+    local file = ks.SaveKey and (ks.FileName or "AuraLuxe/Key.txt")
     local function valid(k)
-        for _, v in ipairs(keys) do if tostring(k) == tostring(v) then return true end end
+        local trimmed = tostring(k):match("^%s*(.-)%s*$")
+        for _, v in ipairs(keys) do if trimmed == tostring(v) then return true end end
         return false
     end
+
     if file and isfile and readfile then
         local ok, s = pcall(function() return isfile(file) and readfile(file) end)
         if ok and s and valid(s) then return true end
@@ -207,29 +292,29 @@ local function KeyGate(ks, parent)
     g.DisplayOrder = 10000; g.Parent = parent
 
     local F = Instance.new("Frame"); F.AnchorPoint = Vector2.new(.5, .5); F.Position = UDim2.fromScale(.5, .5)
-    F.Size = UDim2.fromOffset(300, 175); F.BorderSizePixel = 0; Th(F, "BackgroundColor3", "Background")
+    F.Size = UDim2.fromOffset(320, 195); F.BorderSizePixel = 0; Th(F, "BackgroundColor3", "Background")
     F.Parent = g; Corner(F, 3); Stroke(F, "Stroke", 1)
 
     local t = Label(F, ks.Title or "Key Verification", 13, "Text", FONTB)
     t.Position = UDim2.fromOffset(12, 10); t.Size = UDim2.new(1, -24, 0, 18)
 
-    local n = Label(F, ks.Note or "Enter valid key to proceed.", 10, "SubText")
-    n.Position = UDim2.fromOffset(12, 30); n.Size = UDim2.new(1, -24, 0, 16)
+    local sub = Label(F, ks.Subtitle or ks.Note or "Enter valid key to proceed.", 10, "SubText")
+    sub.Position = UDim2.fromOffset(12, 30); sub.Size = UDim2.new(1, -24, 0, 16)
 
     local box = Instance.new("TextBox")
-    box.Position = UDim2.fromOffset(12, 54); box.Size = UDim2.new(1, -24, 0, 30)
-    box.PlaceholderText = "Paste key..."; box.Text = ""; box.TextSize = 11; box.Font = FONT
+    box.Position = UDim2.fromOffset(12, 56); box.Size = UDim2.new(1, -24, 0, 32)
+    box.PlaceholderText = "Paste key here..."; box.Text = ""; box.TextSize = 11; box.Font = FONT
     box.ClearTextOnFocus = false
     Th(box, "BackgroundColor3", "Card"); Th(box, "TextColor3", "Text"); Th(box, "PlaceholderColor3", "SubText")
     box.Parent = F; Corner(box, 3); Stroke(box, "Stroke", 1); Pad(box, 8, 0, 8, 0)
 
     local btn = Instance.new("TextButton")
-    btn.Position = UDim2.fromOffset(12, 94); btn.Size = UDim2.new(1, -24, 0, 32)
-    btn.Text = "Unlock"; btn.TextSize = 12; btn.Font = FONTB; btn.AutoButtonColor = false
+    btn.Position = UDim2.fromOffset(12, 100); btn.Size = UDim2.new(1, -24, 0, 32)
+    btn.Text = "Verify Key"; btn.TextSize = 12; btn.Font = FONTB; btn.AutoButtonColor = false
     Th(btn, "BackgroundColor3", "Accent"); btn.TextColor3 = Color3.new(1, 1, 1); btn.Parent = F; Corner(btn, 3)
 
     local st = Label(F, "", 10, "Danger", FONT, Enum.TextXAlignment.Center)
-    st.Position = UDim2.fromOffset(12, 136); st.Size = UDim2.new(1, -24, 0, 16)
+    st.Position = UDim2.fromOffset(12, 142); st.Size = UDim2.new(1, -24, 0, 16)
 
     local result
     btn.Activated:Connect(function()
@@ -237,10 +322,10 @@ local function KeyGate(ks, parent)
             result = true
             if file and writefile then pcall(function()
                 if makefolder and not isfolder("AuraLuxe") then makefolder("AuraLuxe") end
-                writefile(file, box.Text)
+                writefile(file, box.Text:match("^%s*(.-)%s*$"))
             end) end
         else
-            st.Text = "Invalid key, try again."
+            st.Text = "Invalid key, please try again."
         end
     end)
 
@@ -249,7 +334,7 @@ local function KeyGate(ks, parent)
     return result == true
 end
 
--- ======================= Main Window =======================
+-- ======================= Main Window Engine =======================
 function Lib:GetFlag(n) return self.Flags[n] end
 function Lib:SetFlag(n, v) if self.Registry[n] then self.Registry[n](v) else self.Flags[n] = v end end
 function Lib:Notify(cfg) local w = self._wins[#self._wins]; if w then return w:Notify(cfg) end end
@@ -264,11 +349,15 @@ function Lib:CreateWindow(cfg)
     Lib.Flags, Lib.Registry, Lib.NoSave = {}, {}, {}
 
     local Parent = SafeParent()
-    if cfg.KeySystem and not KeyGate(cfg.KeySystem, Parent) then return nil end
 
-    local Title = cfg.Title or "AURA LUXE"
-    local Subtitle = cfg.Subtitle or "Apex v4.2"
-    local W, H = 500, 305
+    -- Rayfield KeySystem Support
+    if (cfg.KeySystem == true or type(cfg.KeySettings) == "table") and cfg.KeySettings then
+        if not KeyGate(cfg.KeySettings, Parent) then return nil end
+    end
+
+    local Title = cfg.Name or cfg.Title or "AURA LUXE GEN2"
+    local Subtitle = cfg.Subtitle or "Apex Edition"
+    local W, H = 510, 315
     if type(cfg.Size) == "table" then W, H = cfg.Size[1] or W, cfg.Size[2] or H end
     local PAGE_W = W - 140 - 8
     local CS = cfg.ConfigurationSaving or {}
@@ -277,7 +366,7 @@ function Lib:CreateWindow(cfg)
     local function Conn(sig, fn) local c = sig:Connect(fn); conns[#conns + 1] = c; return c end
 
     local Gui = Instance.new("ScreenGui")
-    Gui.Name = "Aura_" .. HttpService:GenerateGUID(false):sub(1, 8)
+    Gui.Name = "AuraGen2_" .. HttpService:GenerateGUID(false):sub(1, 8)
     Gui.ResetOnSpawn = false; Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     Gui.IgnoreGuiInset = true; Gui.DisplayOrder = 2147483000
     if syn and syn.protect_gui then pcall(syn.protect_gui, Gui) end
@@ -285,7 +374,7 @@ function Lib:CreateWindow(cfg)
     Win.Gui = Gui
     pcall(function() getgenv().__AuraLuxe = Win end)
 
-    -- Responsive UIScale Engine
+    -- Responsive Mobile UIScale Engine
     local function Fit()
         local cam = Workspace.CurrentCamera
         local a = cam and cam.ViewportSize or Gui.AbsoluteSize
@@ -293,7 +382,7 @@ function Lib:CreateWindow(cfg)
         return math.clamp(math.min(a.X * 0.94 / W, a.Y * 0.9 / H), 0.52, 1) * (cfg.Scale or 1)
     end
 
-    -- ========== Screen Blur (99%) + Dimmer ==========
+    -- Screen Blur (99%) + Dimmer
     local Blur = Instance.new("BlurEffect")
     Blur.Name = "Aura_Blur"; Blur.Size = 56; Blur.Parent = Lighting
 
@@ -301,7 +390,7 @@ function Lib:CreateWindow(cfg)
     Dimmer.Size = UDim2.fromScale(1, 1); Dimmer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     Dimmer.BackgroundTransparency = 0.35; Dimmer.BorderSizePixel = 0; Dimmer.ZIndex = 1000; Dimmer.Parent = Gui
 
-    -- ========== Neon White Stepped Loader ==========
+    -- Neon White Stepped Loader
     local LoadHolder = Instance.new("Frame")
     LoadHolder.AnchorPoint = Vector2.new(.5, .5); LoadHolder.Position = UDim2.fromScale(.5, .5)
     LoadHolder.Size = UDim2.fromOffset(320, 85); LoadHolder.BackgroundTransparency = 1; LoadHolder.ZIndex = 1001; LoadHolder.Parent = Gui
@@ -309,14 +398,15 @@ function Lib:CreateWindow(cfg)
     local NeonLoading = Instance.new("TextLabel")
     NeonLoading.Size = UDim2.new(1, 0, 0, 32); NeonLoading.BackgroundTransparency = 1
     NeonLoading.Font = FONTB; NeonLoading.TextSize = 22; NeonLoading.TextColor3 = Color3.fromRGB(255, 255, 255)
-    NeonLoading.RichText = true; NeonLoading.Text = '<stroke color="#FFFFFF" thickness="1.2">Loading</stroke>'
+    NeonLoading.RichText = true
+    NeonLoading.Text = string.format('<stroke color="#FFFFFF" thickness="1.2">%s</stroke>', cfg.LoadingTitle or "Loading")
     NeonLoading.Parent = LoadHolder
 
     local StageLabel = Instance.new("TextLabel")
     StageLabel.Position = UDim2.fromOffset(0, 36); StageLabel.Size = UDim2.new(1, 0, 0, 20)
     StageLabel.BackgroundTransparency = 1; StageLabel.Font = FONT; StageLabel.TextSize = 13
     StageLabel.TextColor3 = Color3.fromRGB(215, 220, 235); StageLabel.RichText = true
-    StageLabel.Text = 'Initializing ""'; StageLabel.Parent = LoadHolder
+    StageLabel.Text = cfg.LoadingSubtitle or 'Initializing ""'; StageLabel.Parent = LoadHolder
 
     local ProgressBar = Instance.new("Frame")
     ProgressBar.Position = UDim2.fromOffset(36, 66); ProgressBar.Size = UDim2.new(1, -72, 0, 3)
@@ -329,16 +419,17 @@ function Lib:CreateWindow(cfg)
 
     local dotsRunning = true
     task.spawn(function()
+        local baseLoadText = cfg.LoadingTitle or "Loading"
         local dots = {"", ".", "..", "..."}
         local dIdx = 1
         while dotsRunning and Gui.Parent do
-            NeonLoading.Text = string.format('<stroke color="#FFFFFF" thickness="1.2">Loading%s</stroke>', dots[dIdx])
+            NeonLoading.Text = string.format('<stroke color="#FFFFFF" thickness="1.2">%s%s</stroke>', baseLoadText, dots[dIdx])
             dIdx = (dIdx % #dots) + 1
             task.wait(0.07)
         end
     end)
 
-    -- ========== Main Window Frame ==========
+    -- Main Window Frame
     local Main = Instance.new("Frame")
     Main.Name = "Main"; Main.AnchorPoint = Vector2.new(.5, .5)
     Main.Position = UDim2.new(0.5, 0, -0.6, 0)
@@ -361,8 +452,18 @@ function Lib:CreateWindow(cfg)
     HPatch.Size = UDim2.new(1, 0, 0, 8); HPatch.Position = UDim2.new(0, 0, 1, -8); HPatch.BorderSizePixel = 0
     Th(HPatch, "BackgroundColor3", "Header"); HPatch.Parent = Header
 
+    local titleXOffset = 10
+    local resolvedWinIcon = ResolveIcon(cfg.Icon)
+    if resolvedWinIcon then
+        local IconImg = Instance.new("ImageLabel")
+        IconImg.Position = UDim2.fromOffset(10, 8); IconImg.Size = UDim2.fromOffset(20, 20)
+        IconImg.BackgroundTransparency = 1; IconImg.Image = resolvedWinIcon; IconImg.Parent = Header
+        Th(IconImg, "ImageColor3", "Accent")
+        titleXOffset = 36
+    end
+
     local TL = Label(Header, Title, 12, "Text", FONTB)
-    TL.Position = UDim2.fromOffset(10, 0); TL.Size = UDim2.fromOffset(160, 36)
+    TL.Position = UDim2.fromOffset(titleXOffset, 0); TL.Size = UDim2.fromOffset(160, 36)
 
     local function HBtn(txt, x)
         local b = Instance.new("TextButton")
@@ -376,7 +477,7 @@ function Lib:CreateWindow(cfg)
 
     local SearchBox = Instance.new("TextBox")
     SearchBox.AnchorPoint = Vector2.new(1, .5); SearchBox.Position = UDim2.new(1, -64, .5, 0)
-    SearchBox.Size = UDim2.fromOffset(100, 22); SearchBox.PlaceholderText = "Search..."; SearchBox.Text = ""
+    SearchBox.Size = UDim2.fromOffset(95, 22); SearchBox.PlaceholderText = "Search..."; SearchBox.Text = ""
     SearchBox.TextSize = 10; SearchBox.Font = FONT; SearchBox.ClearTextOnFocus = false
     Th(SearchBox, "BackgroundColor3", "Card"); Th(SearchBox, "TextColor3", "Text"); Th(SearchBox, "PlaceholderColor3", "SubText")
     SearchBox.Parent = Header; Corner(SearchBox, 3); Stroke(SearchBox, "Stroke", 1); Pad(SearchBox, 6, 0, 6, 0)
@@ -403,7 +504,7 @@ function Lib:CreateWindow(cfg)
     Content.BackgroundTransparency = 1; Content.Position = UDim2.fromOffset(130, 42)
     Content.Size = UDim2.new(1, -136, 1, -48); Content.Parent = Main
 
-    -- ==================== Anti-Jump Drag Engine ====================
+    -- Anti-Jump Relative Drag Engine
     local function MakeDraggable(handle, target)
         local dragInfo = { moved = false }
         local dragging = false
@@ -441,19 +542,13 @@ function Lib:CreateWindow(cfg)
 
     MakeDraggable(Header, Main)
 
-    -- ==================== Resizable Window Handle ====================
+    -- Resizable Window Handle
     if cfg.Resizable == true then
         local ResizeHandle = Instance.new("TextButton")
-        ResizeHandle.AnchorPoint = Vector2.new(1, 1)
-        ResizeHandle.Position = UDim2.new(1, 0, 1, 0)
-        ResizeHandle.Size = UDim2.fromOffset(18, 18)
-        ResizeHandle.Text = "⇲"
-        ResizeHandle.TextSize = 11
-        ResizeHandle.Font = FONTB
-        ResizeHandle.AutoButtonColor = false
-        ResizeHandle.BackgroundTransparency = 1
-        Th(ResizeHandle, "TextColor3", "SubText")
-        ResizeHandle.Parent = Main
+        ResizeHandle.AnchorPoint = Vector2.new(1, 1); ResizeHandle.Position = UDim2.new(1, 0, 1, 0)
+        ResizeHandle.Size = UDim2.fromOffset(18, 18); ResizeHandle.Text = "⇲"; ResizeHandle.TextSize = 11
+        ResizeHandle.Font = FONTB; ResizeHandle.AutoButtonColor = false; ResizeHandle.BackgroundTransparency = 1
+        Th(ResizeHandle, "TextColor3", "SubText"); ResizeHandle.Parent = Main
 
         local resizing = false
         local startMouse, startSize = nil, nil
@@ -491,18 +586,17 @@ function Lib:CreateWindow(cfg)
         end)
     end
 
-    -- Floating Action Button (FAB)
+    -- Mobile FAB Button
     local FAB = Instance.new("TextButton")
     FAB.Name = "AuraFAB"; FAB.AnchorPoint = Vector2.new(.5, .5); FAB.Position = UDim2.fromOffset(38, 100)
-    FAB.Size = UDim2.fromOffset(36, 36); FAB.Text = cfg.ShowText or "⚡"; FAB.TextSize = 16; FAB.Font = FONTB
+    FAB.Size = UDim2.fromOffset(38, 38); FAB.Text = cfg.ShowText or "⚡"; FAB.TextSize = 14; FAB.Font = FONTB
     FAB.AutoButtonColor = false; FAB.Visible = false
     Th(FAB, "BackgroundColor3", "Card"); Th(FAB, "TextColor3", "Accent")
-    FAB.Parent = Gui; Corner(FAB, 18); Stroke(FAB, "Stroke", 1)
+    FAB.Parent = Gui; Corner(FAB, 19); Stroke(FAB, "Stroke", 1)
 
     local fabDrag = MakeDraggable(FAB, FAB)
     FAB.Activated:Connect(function() if not fabDrag.moved then Win:Toggle() end end)
 
-    -- Dropdown Animation (Top to Center in 0.54334s)
     function Win:SetVisible(v)
         Win.Visible = v
         if v then
@@ -519,69 +613,116 @@ function Lib:CreateWindow(cfg)
     HideBtn.Activated:Connect(function() Win:SetVisible(false) end)
     CloseBtn.Activated:Connect(function() Win:Destroy() end)
 
-    -- Keybind (PC)
+    -- Keybind Support
     local tk = cfg.ToggleUIKeybind or "RightShift"
     if typeof(tk) == "EnumItem" then tk = tk.Name end
     Conn(UIS.InputBegan, function(i, gpe)
         if not gpe and i.UserInputType == Enum.UserInputType.Keyboard and i.KeyCode.Name == tk then Win:Toggle() end
     end)
 
-    -- ==================== Notifications with Types & Images ====================
+    -- ==================== Notifications with Actions ====================
     local Holder = Instance.new("Frame"); Holder.BackgroundTransparency = 1; Holder.AnchorPoint = Vector2.new(1, 1)
     Holder.Position = UDim2.new(1, -10, 1, -10); Holder.Size = UDim2.new(0, 240, 1, -20); Holder.Parent = Gui
     local HL = Instance.new("UIListLayout"); HL.VerticalAlignment = Enum.VerticalAlignment.Bottom
     HL.HorizontalAlignment = Enum.HorizontalAlignment.Right; HL.Padding = UDim.new(0, 6); HL.SortOrder = Enum.SortOrder.LayoutOrder; HL.Parent = Holder
-    local nOrder = 0
 
     function Win:Notify(n)
         n = type(n) == "table" and n or { Content = tostring(n) }
-        nOrder = nOrder + 1
-
-        local typeColors = {
-            Success = T.Success,
-            Error   = T.Danger,
-            Warning = T.Warn,
-            Info    = T.Accent
-        }
+        local typeColors = { Success = T.Success, Error = T.Danger, Warning = T.Warn, Info = T.Accent }
         local accentCol = typeColors[n.Type] or T.Accent
 
         local Card = Instance.new("Frame")
         Card.Size = UDim2.new(1, 0, 0, 0); Card.AutomaticSize = Enum.AutomaticSize.Y
         Card.Position = UDim2.fromOffset(40, 0); Card.BorderSizePixel = 0
-        Th(Card, "BackgroundColor3", "Card"); Card.Parent = Holder
-        Corner(Card, 3)
+        Th(Card, "BackgroundColor3", "Card"); Card.Parent = Holder; Corner(Card, 3)
 
         local cardStroke = Instance.new("UIStroke")
-        cardStroke.Thickness = 1
-        cardStroke.Color = accentCol
-        cardStroke.Parent = Card
+        cardStroke.Thickness = 1; cardStroke.Color = accentCol; cardStroke.Parent = Card
         Pad(Card, 8, 6, 8, 6)
 
         local leftOffset = 0
-        if n.Image and n.Image ~= "" then
+        local resolvedNotifImg = ResolveIcon(n.Image)
+        if resolvedNotifImg then
             local Icon = Instance.new("ImageLabel")
             Icon.Position = UDim2.fromOffset(0, 2); Icon.Size = UDim2.fromOffset(24, 24)
-            Icon.BackgroundTransparency = 1; Icon.Image = n.Image; Icon.Parent = Card; Corner(Icon, 3)
+            Icon.BackgroundTransparency = 1; Icon.Image = resolvedNotifImg; Icon.Parent = Card; Corner(Icon, 3)
             leftOffset = 30
         end
 
-        local t = Label(Card, n.Title or (n.Type or "Alert"), 11, "Text", FONTB)
-        t.Position = UDim2.fromOffset(leftOffset, 0); t.Size = UDim2.new(1, -leftOffset, 0, 14)
-        t.TextColor3 = accentCol
+        local t = Label(Card, n.Title or (n.Type or "Notification"), 11, "Text", FONTB)
+        t.Position = UDim2.fromOffset(leftOffset, 0); t.Size = UDim2.new(1, -leftOffset, 0, 14); t.TextColor3 = accentCol
 
+        local c = nil
         if n.Content then
-            local c = Label(Card, n.Content, 10, "SubText", FONT)
+            c = Label(Card, n.Content, 10, "SubText", FONT)
             c.Position = UDim2.fromOffset(leftOffset, 16)
             c.Size = UDim2.new(1, -leftOffset, 0, 0); c.AutomaticSize = Enum.AutomaticSize.Y; c.TextWrapped = true
         end
 
+        local actHolder = nil
+        if type(n.Actions) == "table" and #n.Actions > 0 then
+            actHolder = Instance.new("Frame")
+            actHolder.Position = UDim2.new(0, leftOffset, 0, (c and 18 or 0) + 18)
+            actHolder.Size = UDim2.new(1, -leftOffset, 0, 22); actHolder.BackgroundTransparency = 1; actHolder.Parent = Card
+            local aL = Instance.new("UIListLayout"); aL.FillDirection = Enum.FillDirection.Horizontal
+            aL.Padding = UDim.new(0, 4); aL.Parent = actHolder
+
+            for _, act in ipairs(n.Actions) do
+                local aBtn = Instance.new("TextButton")
+                aBtn.Size = UDim2.new(0, 0, 1, 0); aBtn.AutomaticSize = Enum.AutomaticSize.X; aBtn.Text = act.Name or "Action"
+                aBtn.TextSize = 10; aBtn.Font = FONTB; aBtn.AutoButtonColor = false
+                Th(aBtn, "BackgroundColor3", "Sidebar"); Th(aBtn, "TextColor3", "Accent")
+                aBtn.Parent = actHolder; Corner(aBtn, 2); Stroke(aBtn, "Stroke", 1); Pad(aBtn, 6, 0, 6, 0)
+
+                aBtn.Activated:Connect(function()
+                    Safe(act.Callback)
+                    if Card and Card.Parent then Card:Destroy() end
+                end)
+            end
+        end
+
         Tw(Card, { Position = UDim2.fromOffset(0, 0) }, 0.25)
-        task.delay(n.Duration or 3, function()
+        task.delay(n.Duration or 3.5, function()
             if Card and Card.Parent then
                 Tw(Card, { Position = UDim2.fromOffset(40, 0) }, 0.2)
                 task.wait(0.22); Card:Destroy()
             end
         end)
+    end
+
+    -- Discord Integration Engine
+    if cfg.Discord and cfg.Discord.Enabled and cfg.Discord.Invite then
+        local inv = cfg.Discord.Invite
+        local joinFile = "AuraLuxe/Discord_" .. (inv:gsub("[^%w_%-]", "")) .. ".txt"
+        local shouldShow = true
+        if cfg.Discord.RememberJoins and isfile and isfile(joinFile) then shouldShow = false end
+
+        if shouldShow then
+            task.delay(1.5, function()
+                Win:Notify({
+                    Title = "Join Discord",
+                    Content = "Join our community! Invite: " .. inv,
+                    Duration = 8,
+                    Type = "Info",
+                    Actions = {
+                        {
+                            Name = "Copy Link",
+                            Callback = function()
+                                if setclipboard then setclipboard(inv) end
+                                if cfg.Discord.RememberJoins and writefile then
+                                    pcall(function()
+                                        if makefolder and not isfolder("AuraLuxe") then makefolder("AuraLuxe") end
+                                        writefile(joinFile, "joined")
+                                    end)
+                                end
+                                Win:Notify({ Title = "Copied", Content = "Discord invite copied to clipboard!", Type = "Success", Duration = 2 })
+                            end
+                        },
+                        { Name = "Dismiss", Callback = function() end }
+                    }
+                })
+            end)
+        end
     end
 
     -- Config Engine
@@ -650,17 +791,60 @@ function Lib:CreateWindow(cfg)
         return { SetText = function(_, t) custom = t end }
     end
 
-    -- ==================== Tabs & Element Generation Engine ====================
-    local tabCount = 0
-    function Win:CreateTab(name, icon)
-        tabCount = tabCount + 1
+    -- ==================== Sidebar Sections ====================
+    local sidebarOrder = 0
+    function Win:CreateSection(cfgSection)
+        sidebarOrder = sidebarOrder + 1
+        local secName = type(cfgSection) == "table" and (cfgSection.name or cfgSection.Name) or tostring(cfgSection)
+        local secIcon = type(cfgSection) == "table" and (cfgSection.icon or cfgSection.Icon)
+
+        local SFrame = Instance.new("Frame")
+        SFrame.Size = UDim2.new(1, 0, 0, 18); SFrame.BackgroundTransparency = 1
+        SFrame.LayoutOrder = sidebarOrder; SFrame.Parent = TabScroll
+
+        local xOff = 2
+        local resolvedSecIcon = ResolveIcon(secIcon)
+        if resolvedSecIcon then
+            local Ic = Instance.new("ImageLabel")
+            Ic.Position = UDim2.fromOffset(2, 2); Ic.Size = UDim2.fromOffset(13, 13)
+            Ic.BackgroundTransparency = 1; Ic.Image = resolvedSecIcon; Ic.Parent = SFrame
+            Th(Ic, "ImageColor3", "SubText")
+            xOff = 18
+        end
+
+        local SLbl = Label(SFrame, string.upper(secName), 9, "SubText", FONTB)
+        SLbl.Position = UDim2.fromOffset(xOff, 0); SLbl.Size = UDim2.new(1, -xOff, 1, 0)
+
+        return {
+            Set = function(_, t) SLbl.Text = string.upper(tostring(t)) end,
+            SetVisible = function(_, v) SFrame.Visible = v end,
+            Destroy = function(_) if SFrame.Parent then SFrame:Destroy() end end
+        }
+    end
+
+    -- ==================== Tab & Rayfield Gen2 Group Builder ====================
+    function Win:CreateTab(tabCfg, legacyIcon)
+        local tabName = type(tabCfg) == "table" and (tabCfg.name or tabCfg.Name) or tostring(tabCfg)
+        local tabIcon = type(tabCfg) == "table" and (tabCfg.icon or tabCfg.Icon) or legacyIcon
+
+        sidebarOrder = sidebarOrder + 1
         local Tab = {}
         local Btn = Instance.new("TextButton")
         Btn.Size = UDim2.new(1, 0, 0, 26); Btn.Text = ""; Btn.AutoButtonColor = false
-        Btn.BackgroundTransparency = 1; Btn.LayoutOrder = tabCount; Btn.Parent = TabScroll; Corner(Btn, 3)
+        Btn.BackgroundTransparency = 1; Btn.LayoutOrder = sidebarOrder; Btn.Parent = TabScroll; Corner(Btn, 3)
 
-        local TLb = Label(Btn, name, 11, "SubText", FONT)
-        TLb.Position = UDim2.fromOffset(8, 0); TLb.Size = UDim2.new(1, -16, 1, 0)
+        local tLeft = 8
+        local resolvedTabIcon = ResolveIcon(tabIcon)
+        if resolvedTabIcon then
+            local TIcon = Instance.new("ImageLabel")
+            TIcon.Position = UDim2.fromOffset(6, 5); TIcon.Size = UDim2.fromOffset(16, 16)
+            TIcon.BackgroundTransparency = 1; TIcon.Image = resolvedTabIcon; TIcon.Parent = Btn
+            Th(TIcon, "ImageColor3", "SubText")
+            tLeft = 26
+        end
+
+        local TLb = Label(Btn, tabName, 11, "SubText", FONT)
+        TLb.Position = UDim2.fromOffset(tLeft, 0); TLb.Size = UDim2.new(1, -tLeft - 4, 1, 0)
 
         local Page = Instance.new("ScrollingFrame")
         Page.BackgroundTransparency = 1; Page.BorderSizePixel = 0; Page.Size = UDim2.fromScale(1, 1)
@@ -678,21 +862,39 @@ function Lib:CreateWindow(cfg)
             end
         end)
 
-        local function Paint(act)
-            Tw(Btn, { BackgroundTransparency = act and 0 or 1, BackgroundColor3 = T.Card }, 0.15)
-            Tw(TLb, { TextColor3 = act and T.Text or T.SubText }, 0.15)
+        local function Paint(act, noAnim)
+            local t = noAnim and 0 or 0.15
+            Tw(Btn, { BackgroundTransparency = act and 0 or 1, BackgroundColor3 = T.Card }, t)
+            Tw(TLb, { TextColor3 = act and T.Text or T.SubText }, t)
+            local ic = Btn:FindFirstChildOfClass("ImageLabel")
+            if ic then Tw(ic, { ImageColor3 = act and T.Accent or T.SubText }, t) end
         end
         local obj = { Btn = Btn, Label = TLb, Page = Page, Paint = Paint }
 
-        function Tab:Select()
+        function Tab:Select(noAnim)
             if SearchBox then SearchBox.Text = "" end
             if Win.Current == obj then return end
-            if Win.Current then Win.Current.Page.Visible = false; Win.Current.Paint(false) end
+            if Win.Current then Win.Current.Page.Visible = false; Win.Current.Paint(false, noAnim) end
             Win.Current = obj
-            Page.Visible = true; Paint(true)
+            Page.Visible = true; Paint(true, noAnim)
         end
+
+        function Tab:Deselect(noAnim)
+            if Win.Current == obj then
+                Page.Visible = false
+                Paint(false, noAnim)
+                Win.Current = nil
+            end
+        end
+
+        function Tab:Remove()
+            if Win.Current == obj then Win.Current = nil end
+            Btn:Destroy()
+            Page:Destroy()
+        end
+
         Btn.Activated:Connect(function() Tab:Select() end)
-        if not Win.Current then Tab:Select() end
+        if not Win.Current then Tab:Select(true) end
 
         -- Central Element Factory Function
         local function BuildControls(targetParent, targetWidth, targetObj, isCol)
@@ -708,7 +910,7 @@ function Lib:CreateWindow(cfg)
                 F.Size = UDim2.new(1, 0, 0, h); F.BorderSizePixel = 0; F.LayoutOrder = order
                 Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent; Corner(F, 3); Stroke(F, "Stroke", 1)
 
-                local L = Label(F, c.Name or "Control", 11, "Text", FONT)
+                local L = Label(F, c.Name or c.Title or "Control", 11, "Text", FONT)
                 L.Position = UDim2.fromOffset(8, 0)
                 L.Size = UDim2.new(1, -(16 + effRightW), 1, 0)
 
@@ -716,34 +918,56 @@ function Lib:CreateWindow(cfg)
                     local infoBtn = Instance.new("TextButton")
                     infoBtn.AnchorPoint = Vector2.new(1, .5)
                     infoBtn.Position = UDim2.new(1, -(rightW or 0) - 4, .5, 0)
-                    infoBtn.Size = UDim2.fromOffset(15, 15)
-                    infoBtn.Text = "?"
-                    infoBtn.TextSize = 10
-                    infoBtn.Font = FONTB
-                    infoBtn.AutoButtonColor = false
-                    Th(infoBtn, "BackgroundColor3", "Sidebar")
-                    Th(infoBtn, "TextColor3", "SubText")
+                    infoBtn.Size = UDim2.fromOffset(15, 15); infoBtn.Text = "?"
+                    infoBtn.TextSize = 10; infoBtn.Font = FONTB; infoBtn.AutoButtonColor = false
+                    Th(infoBtn, "BackgroundColor3", "Sidebar"); Th(infoBtn, "TextColor3", "SubText")
                     infoBtn.Parent = F; Corner(infoBtn, 8); Stroke(infoBtn, "Stroke", 1)
 
                     infoBtn.Activated:Connect(function()
-                        Win:Notify({
-                            Title = c.Name or "Information",
-                            Content = c.Desc,
-                            Type = "Info",
-                            Duration = 3
-                        })
+                        Win:Notify({ Title = c.Name or c.Title or "Information", Content = c.Desc, Type = "Info", Duration = 3 })
                     end)
                 end
 
-                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower((c.Name or "") .. " " .. (c.Desc or "")) }
+                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower((c.Name or c.Title or "") .. " " .. (c.Desc or "")) }
                 return F, L
             end
 
-            -- Sections & Layout Utilities
+            -- ==================== Rayfield Gen2 Groups ====================
+            function targetObj:CreateGroup(gCfg)
+                gCfg = gCfg or {}
+                order = order + 1
+                local dir = (gCfg.direction or gCfg.Direction or "column"):lower()
+
+                local GF = Instance.new("Frame")
+                GF.BackgroundTransparency = 1; GF.BorderSizePixel = 0; GF.LayoutOrder = order
+                GF.Parent = targetParent
+
+                local GL = Instance.new("UIListLayout")
+                GL.SortOrder = Enum.SortOrder.LayoutOrder; GL.Padding = UDim.new(0, 4); GL.Parent = GF
+
+                if dir == "row" then
+                    GF.Size = UDim2.new(1, 0, 0, 0); GF.AutomaticSize = Enum.AutomaticSize.Y
+                    GL.FillDirection = Enum.FillDirection.Horizontal
+                else
+                    GF.Size = UDim2.new(1, 0, 0, 0); GF.AutomaticSize = Enum.AutomaticSize.Y
+                    GL.FillDirection = Enum.FillDirection.Vertical
+                end
+
+                local GroupObj = {}
+                BuildControls(GF, targetWidth, GroupObj, dir == "row")
+
+                GroupObj.Frame = GF
+                GroupObj.SetVisible = function(_, v) GF.Visible = v end
+                GroupObj.Destroy = function(_) if GF.Parent then GF:Destroy() end end
+                return GroupObj
+            end
+
+            -- Sections & Labels
             function targetObj:CreateSection(text)
                 order = order + 1
+                local secTitle = type(text) == "table" and (text.name or text.Name or text.Title) or tostring(text)
                 local F = Instance.new("Frame"); F.BackgroundTransparency = 1; F.Size = UDim2.new(1, 0, 0, 20); F.LayoutOrder = order; F.Parent = targetParent
-                local L = Label(F, text or "SECTION", 10, "Accent", FONTB); L.Position = UDim2.fromOffset(4, 0); L.Size = UDim2.new(1, -8, 0, 16)
+                local L = Label(F, secTitle or "SECTION", 10, "Accent", FONTB); L.Position = UDim2.fromOffset(4, 0); L.Size = UDim2.new(1, -8, 0, 16)
                 local ln = Instance.new("Frame"); ln.Size = UDim2.new(1, 0, 0, 1); ln.Position = UDim2.new(0, 0, 1, -1); ln.BorderSizePixel = 0
                 Th(ln, "BackgroundColor3", "Stroke"); ln.Parent = F
                 return {
@@ -767,9 +991,10 @@ function Lib:CreateWindow(cfg)
 
             function targetObj:CreateLabel(text)
                 order = order + 1
-                local L = Label(targetParent, text or "", 10, "SubText", FONT); L.TextWrapped = true
+                local rawText = type(text) == "table" and (text.Text or text.Title) or tostring(text)
+                local L = Label(targetParent, rawText or "", 10, "SubText", FONT); L.TextWrapped = true
                 L.Size = UDim2.new(1, -6, 0, 0); L.AutomaticSize = Enum.AutomaticSize.Y; L.LayoutOrder = order
-                Win.Elements[#Win.Elements + 1] = { Frame = L, Key = string.lower(text or "") }
+                Win.Elements[#Win.Elements + 1] = { Frame = L, Key = string.lower(rawText or "") }
                 return {
                     Set = function(_, t) L.Text = tostring(t) end,
                     SetText = function(_, t) L.Text = tostring(t) end,
@@ -805,7 +1030,7 @@ function Lib:CreateWindow(cfg)
                 }
             end
 
-            -- ==================== Section 1: Dynamic Elements ====================
+            -- ==================== Dynamic AuraLuxe Elements ====================
             function targetObj:CreateDynamicLabel(c)
                 c = c or {}
                 order = order + 1
@@ -834,9 +1059,7 @@ function Lib:CreateWindow(cfg)
                 task.spawn(function()
                     while alive and Win.Alive and F.Parent do
                         task.wait(interval)
-                        if alive and Win.Alive and F.Parent then
-                            Refresh()
-                        end
+                        if alive and Win.Alive and F.Parent then Refresh() end
                     end
                 end)
 
@@ -856,14 +1079,12 @@ function Lib:CreateWindow(cfg)
                 return ctrl
             end
 
-            -- ==================== Section 2: Images & Avatars ====================
             function targetObj:CreateImage(c)
                 c = c or {}
                 order = order + 1
-                local imgId = c.Image or ""
+                local imgId = ResolveIcon(c.Image) or c.Image or ""
                 local size = c.Size or UDim2.new(1, 0, 0, 110)
                 local cornerR = c.CornerRadius or 3
-                local clickable = c.Clickable == true
 
                 local F = Instance.new("Frame")
                 F.Size = size; F.BorderSizePixel = 0; F.LayoutOrder = order
@@ -872,19 +1093,17 @@ function Lib:CreateWindow(cfg)
 
                 local Img = Instance.new("ImageLabel")
                 Img.Size = UDim2.fromScale(1, 1); Img.BackgroundTransparency = 1
-                Img.ScaleType = Enum.ScaleType.Fit; Img.Image = imgId; Img.Parent = F
-                Corner(Img, cornerR)
+                Img.ScaleType = Enum.ScaleType.Fit; Img.Image = imgId; Img.Parent = F; Corner(Img, cornerR)
 
-                if clickable then
+                if c.Clickable == true then
                     local Btn = Instance.new("TextButton")
-                    Btn.Size = UDim2.fromScale(1, 1); Btn.BackgroundTransparency = 1; Btn.Text = ""
-                    Btn.Parent = F
+                    Btn.Size = UDim2.fromScale(1, 1); Btn.BackgroundTransparency = 1; Btn.Text = ""; Btn.Parent = F
                     Btn.Activated:Connect(function() Safe(c.Callback) end)
                 end
 
                 return {
-                    SetImage = function(_, id) Img.Image = tostring(id) end,
-                    Set = function(_, id) Img.Image = tostring(id) end,
+                    SetImage = function(_, id) Img.Image = ResolveIcon(id) or tostring(id) end,
+                    Set = function(_, id) Img.Image = ResolveIcon(id) or tostring(id) end,
                     Get = function() return Img.Image end,
                     SetVisible = function(_, v) F.Visible = v end,
                     Destroy = function(_) if F and F.Parent then F:Destroy() end end
@@ -895,8 +1114,6 @@ function Lib:CreateWindow(cfg)
                 c = c or {}
                 order = order + 1
                 local plr = c.Player or LocalPlayer
-                local clickable = c.Clickable == true
-
                 local F = Instance.new("Frame")
                 F.Size = UDim2.new(1, 0, 0, 48); F.BorderSizePixel = 0; F.LayoutOrder = order
                 Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent; Corner(F, 3); Stroke(F, "Stroke", 1)
@@ -916,10 +1133,9 @@ function Lib:CreateWindow(cfg)
                 local StatsL = Label(F, "HP: -- | Dist: --", 9, "Accent", FONT)
                 StatsL.Position = UDim2.fromOffset(48, 30); StatsL.Size = UDim2.new(1, -54, 0, 13)
 
-                if clickable then
+                if c.Clickable == true then
                     local Btn = Instance.new("TextButton")
-                    Btn.Size = UDim2.fromScale(1, 1); Btn.BackgroundTransparency = 1; Btn.Text = ""
-                    Btn.Parent = F
+                    Btn.Size = UDim2.fromScale(1, 1); Btn.BackgroundTransparency = 1; Btn.Text = ""; Btn.Parent = F
                     Btn.Activated:Connect(function()
                         Tw(F, { BackgroundColor3 = T.CardHover }, 0.08)
                         task.delay(0.1, function() if F and F.Parent then Tw(F, { BackgroundColor3 = T.Card }, 0.15) end end)
@@ -936,19 +1152,11 @@ function Lib:CreateWindow(cfg)
                     local char = plr.Character
                     local hum = char and char:FindFirstChildOfClass("Humanoid")
                     local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
-
-                    local hpStr = "--"
-                    if hum then
-                        hpStr = string.format("%d/%d", math.floor(hum.Health), math.floor(hum.MaxHealth))
-                    end
-
+                    local hpStr = hum and string.format("%d/%d", math.floor(hum.Health), math.floor(hum.MaxHealth)) or "--"
                     local distStr = "--"
                     local myChar = LocalPlayer.Character
                     local myRoot = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso"))
-                    if root and myRoot then
-                        local d = math.floor((root.Position - myRoot.Position).Magnitude)
-                        distStr = d .. "m"
-                    end
+                    if root and myRoot then distStr = math.floor((root.Position - myRoot.Position).Magnitude) .. "m" end
                     StatsL.Text = string.format("HP: %s | Dist: %s", hpStr, distStr)
                 end
                 UpdateStats()
@@ -956,13 +1164,11 @@ function Lib:CreateWindow(cfg)
                 task.spawn(function()
                     while alive and Win.Alive and F.Parent do
                         task.wait(0.5)
-                        if alive and Win.Alive and F.Parent then
-                            UpdateStats()
-                        end
+                        if alive and Win.Alive and F.Parent then UpdateStats() end
                     end
                 end)
 
-                local ctrl = {
+                return {
                     GetPlayer = function() return plr end,
                     Get = function() return plr end,
                     SetVisible = function(_, v) F.Visible = v end,
@@ -971,11 +1177,8 @@ function Lib:CreateWindow(cfg)
                         if F and F.Parent then F:Destroy() end
                     end
                 }
-                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower(plr.Name .. " " .. plr.DisplayName) }
-                return ctrl
             end
 
-            -- ==================== Section 3: Advanced Lists ====================
             function targetObj:CreatePlayerList(c)
                 c = c or {}
                 order = order + 1
@@ -1029,20 +1232,14 @@ function Lib:CreateWindow(cfg)
                 local alive = true
                 local function BuildList()
                     if not alive or not F.Parent then return end
-                    for _, ch in ipairs(ListScroll:GetChildren()) do
-                        if ch:IsA("Frame") then ch:Destroy() end
-                    end
-
+                    for _, ch in ipairs(ListScroll:GetChildren()) do if ch:IsA("Frame") then ch:Destroy() end end
                     for _, p in ipairs(Players:GetPlayers()) do
                         local pRow = Instance.new("Frame")
                         pRow.Size = UDim2.new(1, 0, 0, 28); pRow.BorderSizePixel = 0
                         Th(pRow, "BackgroundColor3", "Sidebar"); pRow.Parent = ListScroll; Corner(pRow, 2)
 
                         local keyVal = Instance.new("StringValue")
-                        keyVal.Name = "PlayerKey"
-                        keyVal.Value = string.lower(p.Name .. " " .. p.DisplayName)
-                        keyVal.Parent = pRow
-
+                        keyVal.Name = "PlayerKey"; keyVal.Value = string.lower(p.Name .. " " .. p.DisplayName); keyVal.Parent = pRow
                         pRow.Visible = (searchFilter == "") or (keyVal.Value:find(searchFilter, 1, true) ~= nil)
 
                         local pThumb = "rbxthumb://type=AvatarHeadShot&id=" .. p.UserId .. "&w=100&h=100"
@@ -1065,12 +1262,10 @@ function Lib:CreateWindow(cfg)
                             for _, r in ipairs(ListScroll:GetChildren()) do
                                 if r:IsA("Frame") and r:FindFirstChildOfClass("TextButton") then
                                     local b = r:FindFirstChildOfClass("TextButton")
-                                    b.Text = "Select"
-                                    Th(b, "BackgroundColor3", "Card")
+                                    b.Text = "Select"; Th(b, "BackgroundColor3", "Card")
                                 end
                             end
-                            sBtn.Text = "Selected"
-                            Th(sBtn, "BackgroundColor3", "Accent")
+                            sBtn.Text = "Selected"; Th(sBtn, "BackgroundColor3", "Accent")
                             Safe(callback, p)
                         end)
                     end
@@ -1080,13 +1275,11 @@ function Lib:CreateWindow(cfg)
                 task.spawn(function()
                     while alive and Win.Alive and F.Parent do
                         task.wait(refreshInterval)
-                        if alive and Win.Alive and F.Parent then
-                            BuildList()
-                        end
+                        if alive and Win.Alive and F.Parent then BuildList() end
                     end
                 end)
 
-                local ctrl = {
+                return {
                     Refresh = BuildList,
                     GetSelected = function() return selectedPlayer end,
                     Get = function() return selectedPlayer end,
@@ -1096,11 +1289,8 @@ function Lib:CreateWindow(cfg)
                         if F and F.Parent then F:Destroy() end
                     end
                 }
-                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower(c.Name or "player directory") }
-                return ctrl
             end
 
-            -- ==================== Section 4: SubTabs ====================
             function targetObj:CreateSubTabs(c)
                 c = c or {}
                 order = order + 1
@@ -1108,8 +1298,7 @@ function Lib:CreateWindow(cfg)
 
                 local F = Instance.new("Frame")
                 F.Size = UDim2.new(1, 0, 0, 0); F.AutomaticSize = Enum.AutomaticSize.Y
-                F.BackgroundTransparency = 1; F.BorderSizePixel = 0; F.LayoutOrder = order
-                F.Parent = targetParent
+                F.BackgroundTransparency = 1; F.BorderSizePixel = 0; F.LayoutOrder = order; F.Parent = targetParent
 
                 local MainLayout = Instance.new("UIListLayout")
                 MainLayout.Padding = UDim.new(0, 4); MainLayout.SortOrder = Enum.SortOrder.LayoutOrder; MainLayout.Parent = F
@@ -1121,9 +1310,7 @@ function Lib:CreateWindow(cfg)
                 BarLayout.FillDirection = Enum.FillDirection.Horizontal; BarLayout.Padding = UDim.new(0, 3); BarLayout.Parent = BarHolder
                 Pad(BarHolder, 3, 2, 3, 2)
 
-                local SubTabObjs = {}
-                local pages = {}
-                local buttons = {}
+                local SubTabObjs, pages, buttons = {}, {}, {}
                 local activeIdx = 1
 
                 for idx, name in ipairs(tabNames) do
@@ -1163,7 +1350,6 @@ function Lib:CreateWindow(cfg)
                 return SubTabObjs
             end
 
-            -- ==================== Section 5: New Useful Controls ====================
             function targetObj:CreateProgressBar(c)
                 c = c or {}
                 order = order + 1
@@ -1195,7 +1381,7 @@ function Lib:CreateWindow(cfg)
                 end
                 UpdateVisual()
 
-                local ctrl = {
+                return {
                     Set = function(_, v)
                         val = math.clamp(tonumber(v) or min, min, max)
                         UpdateVisual()
@@ -1204,8 +1390,6 @@ function Lib:CreateWindow(cfg)
                     SetVisible = function(_, v) F.Visible = v end,
                     Destroy = function(_) if F and F.Parent then F:Destroy() end end
                 }
-                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower(c.Name or "progressbar") }
-                return ctrl
             end
 
             function targetObj:CreateTextArea(c)
@@ -1243,19 +1427,16 @@ function Lib:CreateWindow(cfg)
 
                 local ctrl = {
                     Set = function(_, t)
-                        Box.Text = tostring(t)
-                        SetFlag(flag, Box.Text, c.NoSave)
+                        Box.Text = tostring(t); SetFlag(flag, Box.Text, c.NoSave)
                     end,
                     SetText = function(_, t)
-                        Box.Text = tostring(t)
-                        SetFlag(flag, Box.Text, c.NoSave)
+                        Box.Text = tostring(t); SetFlag(flag, Box.Text, c.NoSave)
                     end,
                     Get = function() return Box.Text end,
                     SetVisible = function(_, v) F.Visible = v end,
                     Destroy = function(_) if F and F.Parent then F:Destroy() end end
                 }
                 Lib.Registry[flag] = function(v) ctrl:Set(v) end
-                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower(c.Name or "textarea") }
                 return ctrl
             end
 
@@ -1272,7 +1453,7 @@ function Lib:CreateWindow(cfg)
 
                 local Img = Instance.new("ImageLabel")
                 Img.Position = UDim2.fromOffset(6, (h - 18) / 2); Img.Size = UDim2.fromOffset(18, 18)
-                Img.BackgroundTransparency = 1; Img.Image = c.Image or ""; Img.Parent = F; Corner(Img, 2)
+                Img.BackgroundTransparency = 1; Img.Image = ResolveIcon(c.Image) or c.Image or ""; Img.Parent = F; Corner(Img, 2)
 
                 local L = Label(F, c.Name or "Button", 11, "Text", FONT)
                 L.Position = UDim2.fromOffset(28, 0); L.Size = UDim2.new(1, -(28 + effRightW), 1, 0)
@@ -1299,29 +1480,25 @@ function Lib:CreateWindow(cfg)
                     Safe(c.Callback)
                 end)
 
-                local ctrl = {
+                return {
                     Set = function(_, t) L.Text = tostring(t) end,
                     SetText = function(_, t) L.Text = tostring(t) end,
-                    SetImage = function(_, id) Img.Image = tostring(id) end,
+                    SetImage = function(_, id) Img.Image = ResolveIcon(id) or tostring(id) end,
                     Get = function() return L.Text end,
                     SetVisible = function(_, v) F.Visible = v end,
                     Destroy = function(_) if F and F.Parent then F:Destroy() end end,
                     Fire = function() Safe(c.Callback) end
                 }
-                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower((c.Name or "") .. " " .. (c.Desc or "")) }
-                return ctrl
             end
 
             function targetObj:CreateCustomFrame(c)
                 c = c or {}
                 order = order + 1
                 local h = tonumber(c.Height) or 100
-
                 local F = Instance.new("Frame")
                 F.Size = UDim2.new(1, 0, 0, h); F.BorderSizePixel = 0; F.LayoutOrder = order
                 Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent; Corner(F, 3); Stroke(F, "Stroke", 1)
                 F.ClipsDescendants = true
-
                 return {
                     Frame = F,
                     SetVisible = function(_, v) F.Visible = v end,
@@ -1329,7 +1506,7 @@ function Lib:CreateWindow(cfg)
                 }
             end
 
-            -- ==================== Standard Core Controls ====================
+            -- ==================== Core Rayfield-Compatible Elements ====================
             function targetObj:CreateButton(c)
                 local F, L = Base(c, 24)
                 local b = Instance.new("TextButton")
@@ -1363,7 +1540,7 @@ function Lib:CreateWindow(cfg)
                 Kn.AnchorPoint = Vector2.new(0, .5); Kn.Size = UDim2.fromOffset(11, 11)
                 Kn.BorderSizePixel = 0; Kn.BackgroundColor3 = Color3.fromRGB(255, 255, 255); Kn.Parent = Sw; Corner(Kn, 6)
 
-                local state = c.Default == true
+                local state = (c.CurrentValue ~= nil and c.CurrentValue) or (c.Default == true)
                 local function PaintSw(an)
                     Tw(Sw, { BackgroundColor3 = state and T.Accent or T.SwitchOff }, an and 0.14 or 0)
                     Tw(Kn, { Position = state and UDim2.new(1, -13, .5, 0) or UDim2.new(0, 2, .5, 0) }, an and 0.14 or 0)
@@ -1374,12 +1551,16 @@ function Lib:CreateWindow(cfg)
                 b.Size = UDim2.fromScale(1, 1); b.BackgroundTransparency = 1; b.Text = ""; b.Parent = F
                 b.Activated:Connect(function()
                     state = not state
-                    PaintSw(true); SetFlag(flag, state, c.NoSave)
+                    PaintSw(true)
+                    SetFlag(flag, state, c.NoSave)
                     Safe(c.Callback, state)
                 end)
+
                 local ctrl = {
                     Set = function(_, v, silent)
-                        state = v == true; PaintSw(true); SetFlag(flag, state, c.NoSave)
+                        state = v == true
+                        PaintSw(true)
+                        SetFlag(flag, state, c.NoSave)
                         if not silent then Safe(c.Callback, state) end
                     end,
                     Get = function() return state end,
@@ -1392,10 +1573,15 @@ function Lib:CreateWindow(cfg)
 
             function targetObj:CreateSlider(c)
                 local flag = c.Flag or c.Name or "Slider"
-                local min, max = c.Min or 0, c.Max or 100
+                local min, max = 0, 100
+                if type(c.Range) == "table" then
+                    min, max = c.Range[1] or 0, c.Range[2] or 100
+                else
+                    min, max = c.Min or 0, c.Max or 100
+                end
                 local inc = c.Increment or 1
                 local suffix = c.Suffix or ""
-                local val = math.clamp(c.Default or min, min, max)
+                local val = math.clamp(c.CurrentValue or c.Default or min, min, max)
                 local F = Base(c, 52)
 
                 local function FormatVal(v)
@@ -1431,6 +1617,7 @@ function Lib:CreateWindow(cfg)
                 end
 
                 PointerDrag(Bar, Page, Update)
+
                 local ctrl = {
                     Set = function(_, v, silent)
                         val = math.clamp(tonumber(v) or min, min, max)
@@ -1451,10 +1638,11 @@ function Lib:CreateWindow(cfg)
                 local flag = c.Flag or c.Name or "Input"
                 local inW = isCol and math.clamp(targetWidth * 0.45, 60, 95) or 105
                 local F = Base(c, inW + 10)
+
                 local box = Instance.new("TextBox")
                 box.AnchorPoint = Vector2.new(1, .5); box.Position = UDim2.new(1, -6, .5, 0)
-                box.Size = UDim2.fromOffset(inW, 20); box.Text = c.Default or ""; box.TextSize = 10; box.Font = FONT
-                box.PlaceholderText = c.Placeholder or "Type..."; box.ClearTextOnFocus = false
+                box.Size = UDim2.fromOffset(inW, 20); box.Text = c.CurrentValue or c.Default or ""; box.TextSize = 10; box.Font = FONT
+                box.PlaceholderText = c.PlaceholderText or c.Placeholder or "Type..."; box.ClearTextOnFocus = false
                 Th(box, "BackgroundColor3", "Sidebar"); Th(box, "TextColor3", "Text"); Th(box, "PlaceholderColor3", "SubText")
                 box.Parent = F; Corner(box, 3); Stroke(box, "Stroke", 1); Pad(box, 6, 0, 6, 0)
 
@@ -1463,7 +1651,9 @@ function Lib:CreateWindow(cfg)
                     if c.NumbersOnly then t = tostring(tonumber(t) or "") box.Text = t end
                     SetFlag(flag, t, c.NoSave)
                     Safe(c.Callback, t, enterPressed)
+                    if c.RemoveTextAfterFocusLost then box.Text = "" end
                 end)
+
                 local ctrl = {
                     Set = function(_, t) box.Text = tostring(t); SetFlag(flag, box.Text, c.NoSave) end,
                     SetText = function(_, t) box.Text = tostring(t); SetFlag(flag, box.Text, c.NoSave) end,
@@ -1479,16 +1669,17 @@ function Lib:CreateWindow(cfg)
                 order = order + 1
                 local flag = c.Flag or c.Name or "Dropdown"
                 local options = c.Options or {}
-                local multi = c.Multi == true
-                local searchable = c.Searchable == true
+                local multi = (c.MultipleOptions == true) or (c.Multi == true)
+                local searchable = (c.Searchable ~= false)
                 local selected, current = {}, nil
 
                 if multi then
-                    for _, v in ipairs(type(c.Default) == "table" and c.Default or (c.Default and {c.Default} or {})) do
+                    local defs = c.CurrentOption or c.Default or {}
+                    for _, v in ipairs(type(defs) == "table" and defs or {defs}) do
                         selected[v] = true
                     end
                 else
-                    current = c.Default or options[1] or ""
+                    current = c.CurrentOption or c.Default or options[1] or ""
                 end
 
                 local F = Instance.new("Frame")
@@ -1627,9 +1818,9 @@ function Lib:CreateWindow(cfg)
 
             function targetObj:CreateKeybind(c)
                 local flag = c.Flag or c.Name or "Keybind"
-                local def = c.Default or "E"
+                local def = c.CurrentKeybind or c.Default or "E"
                 local key = typeof(def) == "EnumItem" and def.Name or tostring(def)
-                local mode = c.Mode == "Hold" and "Hold" or "Toggle"
+                local isHoldMode = (c.Hold == true) or (c.Mode == "Hold")
                 local isListening, isHolding, active = false, false, false
 
                 local F = Base(c, 115)
@@ -1643,7 +1834,7 @@ function Lib:CreateWindow(cfg)
                 end
 
                 local KB = SBtn(key, 46, -6)
-                local MB = SBtn(mode == "Toggle" and "TG" or "HD", 26, -56)
+                local MB = SBtn(isHoldMode and "HD" or "TG", 26, -56)
                 local Trig = SBtn("▶", 22, -86)
 
                 Trig.Activated:Connect(function()
@@ -1652,9 +1843,9 @@ function Lib:CreateWindow(cfg)
                 end)
 
                 MB.Activated:Connect(function()
-                    mode = mode == "Toggle" and "Hold" or "Toggle"
-                    MB.Text = mode == "Toggle" and "TG" or "HD"
-                    SetFlag(flag, { Key = key, Mode = mode }, c.NoSave)
+                    isHoldMode = not isHoldMode
+                    MB.Text = isHoldMode and "HD" or "TG"
+                    SetFlag(flag, { Key = key, Mode = isHoldMode and "Hold" or "Toggle" }, c.NoSave)
                 end)
 
                 KB.Activated:Connect(function()
@@ -1667,11 +1858,11 @@ function Lib:CreateWindow(cfg)
                         isListening = false
                         key = (i.KeyCode ~= Enum.KeyCode.Escape) and i.KeyCode.Name or "None"
                         KB.Text = key
-                        SetFlag(flag, { Key = key, Mode = mode }, c.NoSave)
+                        SetFlag(flag, { Key = key, Mode = isHoldMode and "Hold" or "Toggle" }, c.NoSave)
                         return
                     end
                     if gpe or key == "None" or i.KeyCode.Name ~= key then return end
-                    if mode == "Toggle" then
+                    if not isHoldMode then
                         active = not active; Safe(c.Callback, active, key)
                     elseif not isHolding then
                         isHolding = true; Safe(c.Callback, true, key)
@@ -1679,17 +1870,24 @@ function Lib:CreateWindow(cfg)
                 end)
 
                 Conn(UIS.InputEnded, function(i)
-                    if mode == "Hold" and isHolding and i.KeyCode.Name == key then
+                    if isHoldMode and isHolding and i.KeyCode.Name == key then
                         isHolding = false; Safe(c.Callback, false, key)
                     end
                 end)
 
                 local ctrl = {
                     Set = function(_, d)
-                        if type(d) == "table" then key = d.Key or key; mode = d.Mode or mode else key = tostring(d) end
-                        KB.Text = key; MB.Text = mode == "Toggle" and "TG" or "HD"; SetFlag(flag, { Key = key, Mode = mode }, c.NoSave)
+                        if type(d) == "table" then
+                            key = d.Key or key
+                            if d.Hold ~= nil then isHoldMode = d.Hold == true end
+                            if d.Mode ~= nil then isHoldMode = d.Mode == "Hold" end
+                        else
+                            key = tostring(d)
+                        end
+                        KB.Text = key; MB.Text = isHoldMode and "HD" or "TG"
+                        SetFlag(flag, { Key = key, Mode = isHoldMode and "Hold" or "Toggle" }, c.NoSave)
                     end,
-                    Get = function() return key, mode end,
+                    Get = function() return key, isHoldMode and "Hold" or "Toggle" end,
                     SetVisible = function(_, v) F.Visible = v end,
                     Destroy = function(_) if F and F.Parent then F:Destroy() end end
                 }
@@ -1700,7 +1898,7 @@ function Lib:CreateWindow(cfg)
             function targetObj:CreateColorPicker(c)
                 order = order + 1
                 local flag = c.Flag or c.Name or "ColorPicker"
-                local col = c.Default or T.Accent
+                local col = c.Color or c.Default or T.Accent
                 local h, s, v = col:ToHSV()
                 local open = false
 
@@ -1781,7 +1979,12 @@ function Lib:CreateWindow(cfg)
 
                 local ctrl = {
                     Set = function(_, clr)
-                        if typeof(clr) == "Color3" then h, s, v = clr:ToHSV() Redraw(); SetFlag(flag, col, c.NoSave) end
+                        if typeof(clr) == "Color3" then
+                            h, s, v = clr:ToHSV()
+                            Redraw()
+                            SetFlag(flag, col, c.NoSave)
+                            Safe(c.Callback, col)
+                        end
                     end,
                     Get = function() return col end,
                     SetVisible = function(_, v) F.Visible = v end,
@@ -1803,7 +2006,7 @@ function Lib:CreateWindow(cfg)
                 targetObj:CreateButton({ Name = "Delete Profile", Callback = function() Win:DeleteConfig(slot) end })
                 local thms = {}; for k in pairs(Themes) do thms[#thms + 1] = k end; table.sort(thms)
                 targetObj:CreateDropdown({
-                    Name = "Theme", Options = thms, Default = cfg.Theme or "Dark",
+                    Name = "Theme", Options = thms, Default = cfg.Theme or "Default",
                     Flag = "__Theme", Callback = function(x) Win:SetTheme(x) end
                 })
                 targetObj:CreateButton({ Name = "Destroy Interface", Callback = function() Win:Destroy() end })
@@ -1850,7 +2053,7 @@ function Lib:CreateWindow(cfg)
         Tw(ProgressFill, { Size = UDim2.fromScale(0.60, 1) }, 0.4, Enum.EasingStyle.Linear)
         task.wait(0.4)
 
-        StageLabel.Text = 'Loading "Button\'s & Controls"'
+        StageLabel.Text = 'Loading "Controls & Gen2 Grids"'
         Tw(ProgressFill, { Size = UDim2.fromScale(1.00, 1) }, 0.6, Enum.EasingStyle.Linear)
         task.wait(0.6)
 
