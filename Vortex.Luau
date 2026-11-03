@@ -1,12 +1,15 @@
 --[[ ======================================================================
-    AURA LUXE v4.1  |  Apex Mobile Edition (Delta / Codex / Arceus 2026)
+    AURA LUXE v4.2  |  Apex Mobile Edition (Delta / Codex / Arceus 2026)
     - Full Original Feature-Set Restored (HSV Picker, Keybinds, KeyGate, Configs)
     - 99% Screen Blur + High-Speed Blinking Neon White Loader
-    - True Stepped Loading: 30% (0.5s) -> 30% (0.4s) -> 40% (0.6s) with "" targets
+    - Stepped Loading: 30% (0.5s) -> 30% (0.4s) -> 40% (0.6s) with "" targets
     - 0.54334s Drop Animation (Top to Center) at Maximum Refresh Rate
-    - Compact Sizing + Near-Sharp Corners (3px) + Seamless Black Borders
+    - Compact Sizing + Near-Sharp Corners (3px) + Seamless Borders
     - Anti-Jump Relative Drag Engine (Touch & Mouse Certified)
-    - Responsive Multi-Column Layout & Adaptive UIScale Engine
+    - NEW: DynamicLabel, PlayerCard, PlayerList, SubTabs, ProgressBar,
+           TextArea, ImageButton, CustomFrame, Multi/Search Dropdown,
+           Resizable Window, Suffix/Increment Sliders, Image/Type Notifications,
+           Unified API (Set, Get, SetVisible, Destroy, SetText, SetImage).
     ====================================================================== ]]
 
 local cloneref = cloneref or function(o) return o end
@@ -89,7 +92,7 @@ local Bound, Hooks = {}, {}
 for k, v in pairs(Themes.Dark) do T[k] = v end
 
 local FONT, FONTB = Enum.Font.GothamMedium, Enum.Font.GothamBold
-local Lib = { Version = "4.1", Flags = {}, Registry = {}, NoSave = {}, Themes = Themes, _wins = {} }
+local Lib = { Version = "4.2", Flags = {}, Registry = {}, NoSave = {}, Themes = Themes, _wins = {} }
 
 -- ======================= Core Helpers =======================
 local function Th(inst, prop, key) inst[prop] = T[key]; Bound[#Bound + 1] = { inst, prop, key } end
@@ -145,11 +148,6 @@ local function IsMove(i)
     return i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch
 end
 
-local function Measure(text, size, width)
-    local ok, v = pcall(function() return TextService:GetTextSize(text, size, FONT, Vector2.new(width, 10000)) end)
-    return (ok and v) and v.Y or (size + 2)
-end
-
 local function Label(parent, text, size, key, font, x)
     local l = Instance.new("TextLabel")
     l.BackgroundTransparency = 1; l.Text = text or ""; l.TextSize = size or 11
@@ -192,7 +190,7 @@ local function Decode(v)
     return v
 end
 
--- ======================= [Restored]: KeyGate System =======================
+-- ======================= KeyGate System =======================
 local function KeyGate(ks, parent)
     local keys = type(ks.Key) == "table" and ks.Key or { ks.Key }
     local file = ks.SaveKey and (ks.FileName or "AuraLuxe/key.txt")
@@ -269,7 +267,7 @@ function Lib:CreateWindow(cfg)
     if cfg.KeySystem and not KeyGate(cfg.KeySystem, Parent) then return nil end
 
     local Title = cfg.Title or "AURA LUXE"
-    local Subtitle = cfg.Subtitle or "Apex v4"
+    local Subtitle = cfg.Subtitle or "Apex v4.2"
     local W, H = 500, 305
     if type(cfg.Size) == "table" then W, H = cfg.Size[1] or W, cfg.Size[2] or H end
     local PAGE_W = W - 140 - 8
@@ -287,7 +285,7 @@ function Lib:CreateWindow(cfg)
     Win.Gui = Gui
     pcall(function() getgenv().__AuraLuxe = Win end)
 
-    -- [Restored]: Responsive UIScale Engine
+    -- Responsive UIScale Engine
     local function Fit()
         local cam = Workspace.CurrentCamera
         local a = cam and cam.ViewportSize or Gui.AbsoluteSize
@@ -340,10 +338,10 @@ function Lib:CreateWindow(cfg)
         end
     end)
 
-    -- ========== Main Window Frame (3px Near-Sharp Corners & Black-Matched Borders) ==========
+    -- ========== Main Window Frame ==========
     local Main = Instance.new("Frame")
     Main.Name = "Main"; Main.AnchorPoint = Vector2.new(.5, .5)
-    Main.Position = UDim2.new(0.5, 0, -0.6, 0) -- Starts above screen
+    Main.Position = UDim2.new(0.5, 0, -0.6, 0)
     Main.Size = UDim2.fromOffset(W, H); Main.BorderSizePixel = 0; Main.Visible = false
     Th(Main, "BackgroundColor3", "Background"); Main.Parent = Gui
     Corner(Main, 3)
@@ -443,18 +441,57 @@ function Lib:CreateWindow(cfg)
 
     MakeDraggable(Header, Main)
 
-    local function PointerDrag(frame, page, fn)
-        local active = false
-        Conn(frame.InputBegan, function(i)
-            if IsPointer(i) then active = true; page.ScrollingEnabled = false; fn(i.Position) end
+    -- ==================== Resizable Window Handle ====================
+    if cfg.Resizable == true then
+        local ResizeHandle = Instance.new("TextButton")
+        ResizeHandle.AnchorPoint = Vector2.new(1, 1)
+        ResizeHandle.Position = UDim2.new(1, 0, 1, 0)
+        ResizeHandle.Size = UDim2.fromOffset(18, 18)
+        ResizeHandle.Text = "⇲"
+        ResizeHandle.TextSize = 11
+        ResizeHandle.Font = FONTB
+        ResizeHandle.AutoButtonColor = false
+        ResizeHandle.BackgroundTransparency = 1
+        Th(ResizeHandle, "TextColor3", "SubText")
+        ResizeHandle.Parent = Main
+
+        local resizing = false
+        local startMouse, startSize = nil, nil
+        Conn(ResizeHandle.InputBegan, function(i)
+            if IsPointer(i) then
+                resizing = true
+                startMouse = i.Position
+                startSize = Main.AbsoluteSize
+            end
         end)
-        Conn(UIS.InputChanged, function(i) if active and IsMove(i) then fn(i.Position) end end)
+
+        Conn(UIS.InputChanged, function(i)
+            if resizing and IsMove(i) then
+                local delta = i.Position - startMouse
+                local s = MS.Scale or 1
+                local nw = math.clamp((startSize.X + delta.X) / s, 340, 950)
+                local nh = math.clamp((startSize.Y + delta.Y) / s, 220, 700)
+                Main.Size = UDim2.fromOffset(nw, nh)
+            end
+        end)
+
         Conn(UIS.InputEnded, function(i)
-            if active and IsPointer(i) then active = false; page.ScrollingEnabled = true end
+            if IsPointer(i) then resizing = false end
         end)
     end
 
-    -- Floating Action Button
+    local function PointerDrag(frame, page, fn)
+        local active = false
+        Conn(frame.InputBegan, function(i)
+            if IsPointer(i) then active = true; if page then page.ScrollingEnabled = false end; fn(i.Position) end
+        end)
+        Conn(UIS.InputChanged, function(i) if active and IsMove(i) then fn(i.Position) end end)
+        Conn(UIS.InputEnded, function(i)
+            if active and IsPointer(i) then active = false; if page then page.ScrollingEnabled = true end end
+        end)
+    end
+
+    -- Floating Action Button (FAB)
     local FAB = Instance.new("TextButton")
     FAB.Name = "AuraFAB"; FAB.AnchorPoint = Vector2.new(.5, .5); FAB.Position = UDim2.fromOffset(38, 100)
     FAB.Size = UDim2.fromOffset(36, 36); FAB.Text = cfg.ShowText or "⚡"; FAB.TextSize = 16; FAB.Font = FONTB
@@ -465,7 +502,7 @@ function Lib:CreateWindow(cfg)
     local fabDrag = MakeDraggable(FAB, FAB)
     FAB.Activated:Connect(function() if not fabDrag.moved then Win:Toggle() end end)
 
-    -- ========== Dropdown Animation (Top to Center in 0.54334s) ==========
+    -- Dropdown Animation (Top to Center in 0.54334s)
     function Win:SetVisible(v)
         Win.Visible = v
         if v then
@@ -489,7 +526,7 @@ function Lib:CreateWindow(cfg)
         if not gpe and i.UserInputType == Enum.UserInputType.Keyboard and i.KeyCode.Name == tk then Win:Toggle() end
     end)
 
-    -- Notifications
+    -- ==================== Notifications with Types & Images ====================
     local Holder = Instance.new("Frame"); Holder.BackgroundTransparency = 1; Holder.AnchorPoint = Vector2.new(1, 1)
     Holder.Position = UDim2.new(1, -10, 1, -10); Holder.Size = UDim2.new(0, 240, 1, -20); Holder.Parent = Gui
     local HL = Instance.new("UIListLayout"); HL.VerticalAlignment = Enum.VerticalAlignment.Bottom
@@ -499,17 +536,45 @@ function Lib:CreateWindow(cfg)
     function Win:Notify(n)
         n = type(n) == "table" and n or { Content = tostring(n) }
         nOrder = nOrder + 1
+
+        local typeColors = {
+            Success = T.Success,
+            Error   = T.Danger,
+            Warning = T.Warn,
+            Info    = T.Accent
+        }
+        local accentCol = typeColors[n.Type] or T.Accent
+
         local Card = Instance.new("Frame")
         Card.Size = UDim2.new(1, 0, 0, 0); Card.AutomaticSize = Enum.AutomaticSize.Y
         Card.Position = UDim2.fromOffset(40, 0); Card.BorderSizePixel = 0
         Th(Card, "BackgroundColor3", "Card"); Card.Parent = Holder
-        Corner(Card, 3); Stroke(Card, "Stroke", 1); Pad(Card, 8, 6, 8, 6)
+        Corner(Card, 3)
 
-        local t = Label(Card, n.Title or "Alert", 12, "Text", FONTB); t.Size = UDim2.new(1, 0, 0, 14)
+        local cardStroke = Instance.new("UIStroke")
+        cardStroke.Thickness = 1
+        cardStroke.Color = accentCol
+        cardStroke.Parent = Card
+        Pad(Card, 8, 6, 8, 6)
+
+        local leftOffset = 0
+        if n.Image and n.Image ~= "" then
+            local Icon = Instance.new("ImageLabel")
+            Icon.Position = UDim2.fromOffset(0, 2); Icon.Size = UDim2.fromOffset(24, 24)
+            Icon.BackgroundTransparency = 1; Icon.Image = n.Image; Icon.Parent = Card; Corner(Icon, 3)
+            leftOffset = 30
+        end
+
+        local t = Label(Card, n.Title or (n.Type or "Alert"), 11, "Text", FONTB)
+        t.Position = UDim2.fromOffset(leftOffset, 0); t.Size = UDim2.new(1, -leftOffset, 0, 14)
+        t.TextColor3 = accentCol
+
         if n.Content then
             local c = Label(Card, n.Content, 10, "SubText", FONT)
-            c.Position = UDim2.fromOffset(0, 16); c.Size = UDim2.new(1, 0, 0, 0); c.AutomaticSize = Enum.AutomaticSize.Y; c.TextWrapped = true
+            c.Position = UDim2.fromOffset(leftOffset, 16)
+            c.Size = UDim2.new(1, -leftOffset, 0, 0); c.AutomaticSize = Enum.AutomaticSize.Y; c.TextWrapped = true
         end
+
         Tw(Card, { Position = UDim2.fromOffset(0, 0) }, 0.25)
         task.delay(n.Duration or 3, function()
             if Card and Card.Parent then
@@ -531,7 +596,7 @@ function Lib:CreateWindow(cfg)
         pcall(function() if makefolder and not isfolder(folder) then makefolder(folder) end end)
         local d = {}; for k, v in pairs(Lib.Flags) do if not Lib.NoSave[k] then d[k] = Encode(v) end end
         local ok = pcall(function() writefile(path, HttpService:JSONEncode(d)) end)
-        if not silent then Win:Notify({ Title = ok and "Config Saved" or "Error", Content = path, Duration = 2 }) end
+        if not silent then Win:Notify({ Title = ok and "Config Saved" or "Error", Content = path, Duration = 2, Type = ok and "Success" or "Error" }) end
         return ok
     end
     function Win:LoadConfig(slot, silent)
@@ -545,7 +610,7 @@ function Lib:CreateWindow(cfg)
                 if Lib.Registry[k] then pcall(Lib.Registry[k], v) else Lib.Flags[k] = v end
             end
             Win._loading = false
-            if not silent then Win:Notify({ Title = "Config Loaded", Content = path, Duration = 2 }) end
+            if not silent then Win:Notify({ Title = "Config Loaded", Content = path, Duration = 2, Type = "Success" }) end
             return true
         end
         return false
@@ -553,11 +618,12 @@ function Lib:CreateWindow(cfg)
     function Win:DeleteConfig(slot)
         local _, path = CfgPath(slot)
         local ok = pcall(function() delfile(path) end)
-        Win:Notify({ Title = ok and "Deleted" or "Notice", Content = path, Duration = 2 })
+        Win:Notify({ Title = ok and "Deleted" or "Notice", Content = path, Duration = 2, Type = "Warning" })
     end
     local function SetFlag(flag, v, noSave)
+        if not flag or noSave then return end
         Lib.Flags[flag] = v
-        if noSave or Win._loading or not (CS.Enabled and CS.AutoSave ~= false) then return end
+        if Win._loading or not (CS.Enabled and CS.AutoSave ~= false) then return end
         task.delay(1.2, function() if Win.Alive then Win:SaveConfig(CS.FileName or "Auto", true) end end)
     end
 
@@ -584,7 +650,7 @@ function Lib:CreateWindow(cfg)
         return { SetText = function(_, t) custom = t end }
     end
 
-    -- ==================== Tabs & All Restored Elements ====================
+    -- ==================== Tabs & Element Generation Engine ====================
     local tabCount = 0
     function Win:CreateTab(name, icon)
         tabCount = tabCount + 1
@@ -603,7 +669,6 @@ function Lib:CreateWindow(cfg)
         Th(Page, "ScrollBarImageColor3", "Stroke"); Page.Parent = Content; Pad(Page, 0, 2, 4, 4)
         local PL = Instance.new("UIListLayout"); PL.Padding = UDim.new(0, 4); PL.SortOrder = Enum.SortOrder.LayoutOrder; PL.Parent = Page
 
-        -- [Restored]: Smooth Mouse Wheel Scroll with TweenService
         local tgt = 0
         Conn(Page.InputChanged, function(i)
             if i.UserInputType == Enum.UserInputType.MouseWheel then
@@ -629,72 +694,642 @@ function Lib:CreateWindow(cfg)
         Btn.Activated:Connect(function() Tab:Select() end)
         if not Win.Current then Tab:Select() end
 
-        -- Element Generator Function
+        -- Central Element Factory Function
         local function BuildControls(targetParent, targetWidth, targetObj, isCol)
             local order = 0
+
             local function Base(c, rightW, extraH)
                 order = order + 1
                 local hasDesc = (c.Desc and c.Desc ~= "")
-                local h = hasDesc and 38 or 28
-                h = h + (extraH or 0)
+                local h = 28 + (extraH or 0)
+                local effRightW = (rightW or 0) + (hasDesc and 20 or 0)
+
                 local F = Instance.new("Frame")
                 F.Size = UDim2.new(1, 0, 0, h); F.BorderSizePixel = 0; F.LayoutOrder = order
                 Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent; Corner(F, 3); Stroke(F, "Stroke", 1)
 
                 local L = Label(F, c.Name or "Control", 11, "Text", FONT)
-                L.Position = UDim2.fromOffset(8, hasDesc and 3 or 0)
-                L.Size = UDim2.new(1, -(16 + (rightW or 0)), 0, hasDesc and 14 or h)
+                L.Position = UDim2.fromOffset(8, 0)
+                L.Size = UDim2.new(1, -(16 + effRightW), 1, 0)
 
                 if hasDesc then
-                    local D = Label(F, c.Desc, 9, "SubText", FONT)
-                    D.Position = UDim2.fromOffset(8, 18); D.Size = UDim2.new(1, -(16 + (rightW or 0)), 0, 14)
+                    local infoBtn = Instance.new("TextButton")
+                    infoBtn.AnchorPoint = Vector2.new(1, .5)
+                    infoBtn.Position = UDim2.new(1, -(rightW or 0) - 4, .5, 0)
+                    infoBtn.Size = UDim2.fromOffset(15, 15)
+                    infoBtn.Text = "?"
+                    infoBtn.TextSize = 10
+                    infoBtn.Font = FONTB
+                    infoBtn.AutoButtonColor = false
+                    Th(infoBtn, "BackgroundColor3", "Sidebar")
+                    Th(infoBtn, "TextColor3", "SubText")
+                    infoBtn.Parent = F; Corner(infoBtn, 8); Stroke(infoBtn, "Stroke", 1)
+
+                    infoBtn.Activated:Connect(function()
+                        Win:Notify({
+                            Title = c.Name or "Information",
+                            Content = c.Desc,
+                            Type = "Info",
+                            Duration = 3
+                        })
+                    end)
                 end
+
                 Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower((c.Name or "") .. " " .. (c.Desc or "")) }
                 return F, L
             end
 
-            -- [Restored]: CreateSection
+            -- Sections & Layout Utilities
             function targetObj:CreateSection(text)
                 order = order + 1
                 local F = Instance.new("Frame"); F.BackgroundTransparency = 1; F.Size = UDim2.new(1, 0, 0, 20); F.LayoutOrder = order; F.Parent = targetParent
                 local L = Label(F, text or "SECTION", 10, "Accent", FONTB); L.Position = UDim2.fromOffset(4, 0); L.Size = UDim2.new(1, -8, 0, 16)
                 local ln = Instance.new("Frame"); ln.Size = UDim2.new(1, 0, 0, 1); ln.Position = UDim2.new(0, 0, 1, -1); ln.BorderSizePixel = 0
                 Th(ln, "BackgroundColor3", "Stroke"); ln.Parent = F
-                return { Set = function(_, t) L.Text = t end }
+                return {
+                    Set = function(_, t) L.Text = tostring(t) end,
+                    SetText = function(_, t) L.Text = tostring(t) end,
+                    Get = function() return L.Text end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end
+                }
             end
 
-            -- [Restored]: CreateDivider
             function targetObj:CreateDivider()
                 order = order + 1
                 local ln = Instance.new("Frame"); ln.Size = UDim2.new(1, 0, 0, 1); ln.BorderSizePixel = 0; ln.LayoutOrder = order
                 Th(ln, "BackgroundColor3", "Stroke"); ln.Parent = targetParent
+                return {
+                    SetVisible = function(_, v) ln.Visible = v end,
+                    Destroy = function(_) if ln and ln.Parent then ln:Destroy() end end
+                }
             end
 
-            -- [Restored]: CreateLabel
             function targetObj:CreateLabel(text)
                 order = order + 1
                 local L = Label(targetParent, text or "", 10, "SubText", FONT); L.TextWrapped = true
                 L.Size = UDim2.new(1, -6, 0, 0); L.AutomaticSize = Enum.AutomaticSize.Y; L.LayoutOrder = order
                 Win.Elements[#Win.Elements + 1] = { Frame = L, Key = string.lower(text or "") }
-                return { Set = function(_, t) L.Text = t end }
+                return {
+                    Set = function(_, t) L.Text = tostring(t) end,
+                    SetText = function(_, t) L.Text = tostring(t) end,
+                    Get = function() return L.Text end,
+                    SetVisible = function(_, v) L.Visible = v end,
+                    Destroy = function(_) if L and L.Parent then L:Destroy() end end
+                }
             end
 
-            -- [Restored]: CreateParagraph
             function targetObj:CreateParagraph(c)
                 c = c or {}; order = order + 1
                 local F = Instance.new("Frame"); F.Size = UDim2.new(1, 0, 0, 0); F.AutomaticSize = Enum.AutomaticSize.Y
                 F.BorderSizePixel = 0; F.LayoutOrder = order; Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent
                 Corner(F, 3); Stroke(F, "Stroke", 1); Pad(F, 8, 6, 8, 6)
                 local ly = Instance.new("UIListLayout"); ly.Padding = UDim.new(0, 2); ly.SortOrder = Enum.SortOrder.LayoutOrder; ly.Parent = F
-                local a = Label(F, c.Title or "", 11, "Text", FONTB)
-                a.Size = UDim2.new(1, 0, 0, 14)
+                local a = Label(F, c.Title or "", 11, "Text", FONTB); a.Size = UDim2.new(1, 0, 0, 14)
                 local b = Label(F, c.Content or "", 10, "SubText", FONT)
                 b.Size = UDim2.new(1, 0, 0, 0); b.AutomaticSize = Enum.AutomaticSize.Y; b.TextWrapped = true
                 Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower((c.Title or "") .. " " .. (c.Content or "")) }
-                return { Set = function(_, d) a.Text = d.Title or a.Text; b.Text = d.Content or b.Text end }
+                return {
+                    Set = function(_, d)
+                        if type(d) == "table" then
+                            a.Text = d.Title or a.Text
+                            b.Text = d.Content or b.Text
+                        else
+                            b.Text = tostring(d)
+                        end
+                    end,
+                    SetText = function(_, t) b.Text = tostring(t) end,
+                    Get = function() return { Title = a.Text, Content = b.Text } end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end
+                }
             end
 
-            -- CreateButton
+            -- ==================== Section 1: Dynamic Elements ====================
+            function targetObj:CreateDynamicLabel(c)
+                c = c or {}
+                order = order + 1
+                local name = c.Name or ""
+                local getText = c.GetText or function() return "" end
+                local interval = math.clamp(tonumber(c.Interval) or 1, 0.1, 86400)
+
+                local F = Instance.new("Frame")
+                F.Size = UDim2.new(1, 0, 0, 28); F.BorderSizePixel = 0; F.LayoutOrder = order
+                Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent; Corner(F, 3); Stroke(F, "Stroke", 1)
+
+                local TitleL = Label(F, name, 11, "Text", FONT)
+                TitleL.Position = UDim2.fromOffset(8, 0); TitleL.Size = UDim2.new(0.48, -8, 1, 0)
+
+                local ValL = Label(F, "", 10, "Accent", FONTB, Enum.TextXAlignment.Right)
+                ValL.AnchorPoint = Vector2.new(1, .5); ValL.Position = UDim2.new(1, -8, .5, 0); ValL.Size = UDim2.new(0.5, -8, 1, 0)
+
+                local alive = true
+                local function Refresh()
+                    if not alive or not F.Parent then return end
+                    local ok, txt = pcall(getText)
+                    if ok and txt ~= nil then ValL.Text = tostring(txt) end
+                end
+                Refresh()
+
+                task.spawn(function()
+                    while alive and Win.Alive and F.Parent do
+                        task.wait(interval)
+                        if alive and Win.Alive and F.Parent then
+                            Refresh()
+                        end
+                    end
+                end)
+
+                local ctrl = {
+                    Refresh = Refresh,
+                    SetInterval = function(_, n) interval = math.clamp(tonumber(n) or 1, 0.1, 86400) end,
+                    SetText = function(_, t) ValL.Text = tostring(t) end,
+                    Set = function(_, t) ValL.Text = tostring(t) end,
+                    Get = function() return ValL.Text end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_)
+                        alive = false
+                        if F and F.Parent then F:Destroy() end
+                    end
+                }
+                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower(name) }
+                return ctrl
+            end
+
+            -- ==================== Section 2: Images & Avatars ====================
+            function targetObj:CreateImage(c)
+                c = c or {}
+                order = order + 1
+                local imgId = c.Image or ""
+                local size = c.Size or UDim2.new(1, 0, 0, 110)
+                local cornerR = c.CornerRadius or 3
+                local clickable = c.Clickable == true
+
+                local F = Instance.new("Frame")
+                F.Size = size; F.BorderSizePixel = 0; F.LayoutOrder = order
+                Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent; Corner(F, cornerR); Stroke(F, "Stroke", 1)
+                F.ClipsDescendants = true
+
+                local Img = Instance.new("ImageLabel")
+                Img.Size = UDim2.fromScale(1, 1); Img.BackgroundTransparency = 1
+                Img.ScaleType = Enum.ScaleType.Fit; Img.Image = imgId; Img.Parent = F
+                Corner(Img, cornerR)
+
+                if clickable then
+                    local Btn = Instance.new("TextButton")
+                    Btn.Size = UDim2.fromScale(1, 1); Btn.BackgroundTransparency = 1; Btn.Text = ""
+                    Btn.Parent = F
+                    Btn.Activated:Connect(function() Safe(c.Callback) end)
+                end
+
+                return {
+                    SetImage = function(_, id) Img.Image = tostring(id) end,
+                    Set = function(_, id) Img.Image = tostring(id) end,
+                    Get = function() return Img.Image end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end
+                }
+            end
+
+            function targetObj:CreatePlayerCard(c)
+                c = c or {}
+                order = order + 1
+                local plr = c.Player or LocalPlayer
+                local clickable = c.Clickable == true
+
+                local F = Instance.new("Frame")
+                F.Size = UDim2.new(1, 0, 0, 48); F.BorderSizePixel = 0; F.LayoutOrder = order
+                Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent; Corner(F, 3); Stroke(F, "Stroke", 1)
+
+                local thumb = "rbxthumb://type=AvatarHeadShot&id=" .. plr.UserId .. "&w=150&h=150"
+                local Avatar = Instance.new("ImageLabel")
+                Avatar.Position = UDim2.fromOffset(6, 6); Avatar.Size = UDim2.fromOffset(36, 36)
+                Avatar.BackgroundTransparency = 1; Avatar.Image = thumb; Avatar.Parent = F
+                Corner(Avatar, 18); Stroke(Avatar, "Stroke", 1)
+
+                local NameL = Label(F, plr.DisplayName or plr.Name, 11, "Text", FONTB)
+                NameL.Position = UDim2.fromOffset(48, 5); NameL.Size = UDim2.new(1, -54, 0, 14)
+
+                local SubL = Label(F, "@" .. plr.Name, 9, "SubText", FONT)
+                SubL.Position = UDim2.fromOffset(48, 18); SubL.Size = UDim2.new(1, -54, 0, 12)
+
+                local StatsL = Label(F, "HP: -- | Dist: --", 9, "Accent", FONT)
+                StatsL.Position = UDim2.fromOffset(48, 30); StatsL.Size = UDim2.new(1, -54, 0, 13)
+
+                if clickable then
+                    local Btn = Instance.new("TextButton")
+                    Btn.Size = UDim2.fromScale(1, 1); Btn.BackgroundTransparency = 1; Btn.Text = ""
+                    Btn.Parent = F
+                    Btn.Activated:Connect(function()
+                        Tw(F, { BackgroundColor3 = T.CardHover }, 0.08)
+                        task.delay(0.1, function() if F and F.Parent then Tw(F, { BackgroundColor3 = T.Card }, 0.15) end end)
+                        Safe(c.Callback, plr)
+                    end)
+                end
+
+                local alive = true
+                local function UpdateStats()
+                    if not plr or not plr.Parent then
+                        StatsL.Text = "Left Server"
+                        return
+                    end
+                    local char = plr.Character
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
+
+                    local hpStr = "--"
+                    if hum then
+                        hpStr = string.format("%d/%d", math.floor(hum.Health), math.floor(hum.MaxHealth))
+                    end
+
+                    local distStr = "--"
+                    local myChar = LocalPlayer.Character
+                    local myRoot = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso"))
+                    if root and myRoot then
+                        local d = math.floor((root.Position - myRoot.Position).Magnitude)
+                        distStr = d .. "m"
+                    end
+                    StatsL.Text = string.format("HP: %s | Dist: %s", hpStr, distStr)
+                end
+                UpdateStats()
+
+                task.spawn(function()
+                    while alive and Win.Alive and F.Parent do
+                        task.wait(0.5)
+                        if alive and Win.Alive and F.Parent then
+                            UpdateStats()
+                        end
+                    end
+                end)
+
+                local ctrl = {
+                    GetPlayer = function() return plr end,
+                    Get = function() return plr end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_)
+                        alive = false
+                        if F and F.Parent then F:Destroy() end
+                    end
+                }
+                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower(plr.Name .. " " .. plr.DisplayName) }
+                return ctrl
+            end
+
+            -- ==================== Section 3: Advanced Lists ====================
+            function targetObj:CreatePlayerList(c)
+                c = c or {}
+                order = order + 1
+                local searchable = c.Searchable == true
+                local refreshInterval = math.clamp(tonumber(c.RefreshInterval) or 2, 0.5, 60)
+                local callback = c.Callback or function() end
+                local selectedPlayer = nil
+
+                local totalH = searchable and 180 or 150
+                local F = Instance.new("Frame")
+                F.Size = UDim2.new(1, 0, 0, totalH); F.BorderSizePixel = 0; F.LayoutOrder = order
+                Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent; Corner(F, 3); Stroke(F, "Stroke", 1)
+                F.ClipsDescendants = true
+
+                local topOffset = 6
+                local searchFilter = ""
+
+                local TitleHeader = Label(F, c.Name or "Player Directory", 11, "Text", FONTB)
+                TitleHeader.Position = UDim2.fromOffset(8, topOffset); TitleHeader.Size = UDim2.new(1, -16, 0, 16)
+                topOffset = topOffset + 20
+
+                local ListScroll = Instance.new("ScrollingFrame")
+                local DLL = Instance.new("UIListLayout"); DLL.Padding = UDim.new(0, 3); DLL.Parent = ListScroll
+
+                if searchable then
+                    local SBox = Instance.new("TextBox")
+                    SBox.Position = UDim2.fromOffset(8, topOffset); SBox.Size = UDim2.new(1, -16, 0, 22)
+                    SBox.PlaceholderText = "Search player name..."; SBox.Text = ""; SBox.TextSize = 10; SBox.Font = FONT
+                    SBox.ClearTextOnFocus = false
+                    Th(SBox, "BackgroundColor3", "Sidebar"); Th(SBox, "TextColor3", "Text"); Th(SBox, "PlaceholderColor3", "SubText")
+                    SBox.Parent = F; Corner(SBox, 3); Stroke(SBox, "Stroke", 1); Pad(SBox, 6, 0, 6, 0)
+                    topOffset = topOffset + 26
+
+                    SBox:GetPropertyChangedSignal("Text"):Connect(function()
+                        searchFilter = string.lower(SBox.Text):match("^%s*(.-)%s*$")
+                        for _, row in ipairs(ListScroll:GetChildren()) do
+                            if row:IsA("Frame") and row:FindFirstChild("PlayerKey") then
+                                row.Visible = (searchFilter == "") or (row.PlayerKey.Value:find(searchFilter, 1, true) ~= nil)
+                            end
+                        end
+                    end)
+                end
+
+                ListScroll.Position = UDim2.fromOffset(6, topOffset)
+                ListScroll.Size = UDim2.new(1, -12, 1, -topOffset - 6)
+                ListScroll.BackgroundTransparency = 1; ListScroll.BorderSizePixel = 0; ListScroll.ScrollBarThickness = 2
+                ListScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+                Th(ListScroll, "ScrollBarImageColor3", "Stroke"); ListScroll.Parent = F
+                Pad(ListScroll, 2, 2, 2, 2)
+
+                local alive = true
+                local function BuildList()
+                    if not alive or not F.Parent then return end
+                    for _, ch in ipairs(ListScroll:GetChildren()) do
+                        if ch:IsA("Frame") then ch:Destroy() end
+                    end
+
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        local pRow = Instance.new("Frame")
+                        pRow.Size = UDim2.new(1, 0, 0, 28); pRow.BorderSizePixel = 0
+                        Th(pRow, "BackgroundColor3", "Sidebar"); pRow.Parent = ListScroll; Corner(pRow, 2)
+
+                        local keyVal = Instance.new("StringValue")
+                        keyVal.Name = "PlayerKey"
+                        keyVal.Value = string.lower(p.Name .. " " .. p.DisplayName)
+                        keyVal.Parent = pRow
+
+                        pRow.Visible = (searchFilter == "") or (keyVal.Value:find(searchFilter, 1, true) ~= nil)
+
+                        local pThumb = "rbxthumb://type=AvatarHeadShot&id=" .. p.UserId .. "&w=100&h=100"
+                        local pImg = Instance.new("ImageLabel")
+                        pImg.Position = UDim2.fromOffset(4, 3); pImg.Size = UDim2.fromOffset(22, 22)
+                        pImg.BackgroundTransparency = 1; pImg.Image = pThumb; pImg.Parent = pRow; Corner(pImg, 11)
+
+                        local pLbl = Label(pRow, p.DisplayName .. " (@" .. p.Name .. ")", 10, "Text", FONT)
+                        pLbl.Position = UDim2.fromOffset(32, 0); pLbl.Size = UDim2.new(1, -86, 1, 0)
+
+                        local sBtn = Instance.new("TextButton")
+                        sBtn.AnchorPoint = Vector2.new(1, .5); sBtn.Position = UDim2.new(1, -4, .5, 0)
+                        sBtn.Size = UDim2.fromOffset(46, 20); sBtn.Text = (selectedPlayer == p) and "Selected" or "Select"
+                        sBtn.TextSize = 9; sBtn.Font = FONTB; sBtn.AutoButtonColor = false
+                        Th(sBtn, "BackgroundColor3", (selectedPlayer == p) and "Accent" or "Card")
+                        sBtn.TextColor3 = Color3.new(1, 1, 1); sBtn.Parent = pRow; Corner(sBtn, 2)
+
+                        sBtn.Activated:Connect(function()
+                            selectedPlayer = p
+                            for _, r in ipairs(ListScroll:GetChildren()) do
+                                if r:IsA("Frame") and r:FindFirstChildOfClass("TextButton") then
+                                    local b = r:FindFirstChildOfClass("TextButton")
+                                    b.Text = "Select"
+                                    Th(b, "BackgroundColor3", "Card")
+                                end
+                            end
+                            sBtn.Text = "Selected"
+                            Th(sBtn, "BackgroundColor3", "Accent")
+                            Safe(callback, p)
+                        end)
+                    end
+                end
+                BuildList()
+
+                task.spawn(function()
+                    while alive and Win.Alive and F.Parent do
+                        task.wait(refreshInterval)
+                        if alive and Win.Alive and F.Parent then
+                            BuildList()
+                        end
+                    end
+                end)
+
+                local ctrl = {
+                    Refresh = BuildList,
+                    GetSelected = function() return selectedPlayer end,
+                    Get = function() return selectedPlayer end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_)
+                        alive = false
+                        if F and F.Parent then F:Destroy() end
+                    end
+                }
+                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower(c.Name or "player directory") }
+                return ctrl
+            end
+
+            -- ==================== Section 4: SubTabs ====================
+            function targetObj:CreateSubTabs(c)
+                c = c or {}
+                order = order + 1
+                local tabNames = c.Tabs or { "Sub1", "Sub2" }
+
+                local F = Instance.new("Frame")
+                F.Size = UDim2.new(1, 0, 0, 0); F.AutomaticSize = Enum.AutomaticSize.Y
+                F.BackgroundTransparency = 1; F.BorderSizePixel = 0; F.LayoutOrder = order
+                F.Parent = targetParent
+
+                local MainLayout = Instance.new("UIListLayout")
+                MainLayout.Padding = UDim.new(0, 4); MainLayout.SortOrder = Enum.SortOrder.LayoutOrder; MainLayout.Parent = F
+
+                local BarHolder = Instance.new("Frame")
+                BarHolder.Size = UDim2.new(1, 0, 0, 26); BarHolder.BorderSizePixel = 0
+                Th(BarHolder, "BackgroundColor3", "Sidebar"); BarHolder.Parent = F; Corner(BarHolder, 3)
+                local BarLayout = Instance.new("UIListLayout")
+                BarLayout.FillDirection = Enum.FillDirection.Horizontal; BarLayout.Padding = UDim.new(0, 3); BarLayout.Parent = BarHolder
+                Pad(BarHolder, 3, 2, 3, 2)
+
+                local SubTabObjs = {}
+                local pages = {}
+                local buttons = {}
+                local activeIdx = 1
+
+                for idx, name in ipairs(tabNames) do
+                    local sBtn = Instance.new("TextButton")
+                    sBtn.Size = UDim2.new(1 / #tabNames, -((#tabNames - 1) * 3) / #tabNames, 1, 0)
+                    sBtn.Text = tostring(name); sBtn.TextSize = 10; sBtn.Font = FONT; sBtn.AutoButtonColor = false
+                    Th(sBtn, "BackgroundColor3", idx == 1 and "Card" or "Sidebar")
+                    Th(sBtn, "TextColor3", idx == 1 and "Text" or "SubText")
+                    sBtn.Parent = BarHolder; Corner(sBtn, 3)
+                    buttons[idx] = sBtn
+
+                    local SubPage = Instance.new("Frame")
+                    SubPage.BackgroundTransparency = 1; SubPage.Size = UDim2.new(1, 0, 0, 0)
+                    SubPage.AutomaticSize = Enum.AutomaticSize.Y; SubPage.BorderSizePixel = 0
+                    SubPage.Visible = (idx == 1); SubPage.Parent = F
+                    local SPL = Instance.new("UIListLayout"); SPL.Padding = UDim.new(0, 4); SPL.SortOrder = Enum.SortOrder.LayoutOrder; SPL.Parent = SubPage
+                    pages[idx] = SubPage
+
+                    local subBuilder = {}
+                    BuildControls(SubPage, targetWidth, subBuilder, isCol)
+                    SubTabObjs[idx] = subBuilder
+                    SubTabObjs[name] = subBuilder
+
+                    sBtn.Activated:Connect(function()
+                        if activeIdx == idx then return end
+                        activeIdx = idx
+                        for i, b in ipairs(buttons) do
+                            local act = (i == activeIdx)
+                            Tw(b, { BackgroundColor3 = act and T.Card or T.Sidebar, TextColor3 = act and T.Text or T.SubText }, 0.15)
+                            pages[i].Visible = act
+                        end
+                    end)
+                end
+
+                SubTabObjs.SetVisible = function(_, v) F.Visible = v end
+                SubTabObjs.Destroy = function(_) if F and F.Parent then F:Destroy() end end
+                return SubTabObjs
+            end
+
+            -- ==================== Section 5: New Useful Controls ====================
+            function targetObj:CreateProgressBar(c)
+                c = c or {}
+                order = order + 1
+                local min, max = c.Min or 0, c.Max or 100
+                local val = math.clamp(c.Default or min, min, max)
+
+                local F = Instance.new("Frame")
+                F.Size = UDim2.new(1, 0, 0, 32); F.BorderSizePixel = 0; F.LayoutOrder = order
+                Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent; Corner(F, 3); Stroke(F, "Stroke", 1)
+
+                local L = Label(F, c.Name or "Progress", 11, "Text", FONT)
+                L.Position = UDim2.fromOffset(8, 3); L.Size = UDim2.new(0.65, -8, 0, 14)
+
+                local PctL = Label(F, "", 10, "Accent", FONTB, Enum.TextXAlignment.Right)
+                PctL.AnchorPoint = Vector2.new(1, 0); PctL.Position = UDim2.new(1, -8, 0, 3); PctL.Size = UDim2.new(0.3, 0, 0, 14)
+
+                local Bar = Instance.new("Frame")
+                Bar.Position = UDim2.fromOffset(8, 20); Bar.Size = UDim2.new(1, -16, 0, 6)
+                Bar.BorderSizePixel = 0; Th(Bar, "BackgroundColor3", "SwitchOff"); Bar.Parent = F; Corner(Bar, 3)
+
+                local Fill = Instance.new("Frame")
+                Fill.Size = UDim2.fromScale(0, 1); Fill.BorderSizePixel = 0
+                Th(Fill, "BackgroundColor3", "Accent"); Fill.Parent = Bar; Corner(Fill, 3)
+
+                local function UpdateVisual()
+                    local pct = math.clamp((val - min) / math.max(max - min, 0.0001), 0, 1)
+                    Tw(Fill, { Size = UDim2.fromScale(pct, 1) }, 0.15)
+                    PctL.Text = string.format("%d%%", math.floor(pct * 100))
+                end
+                UpdateVisual()
+
+                local ctrl = {
+                    Set = function(_, v)
+                        val = math.clamp(tonumber(v) or min, min, max)
+                        UpdateVisual()
+                    end,
+                    Get = function() return val end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end
+                }
+                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower(c.Name or "progressbar") }
+                return ctrl
+            end
+
+            function targetObj:CreateTextArea(c)
+                c = c or {}
+                order = order + 1
+                local flag = c.Flag or c.Name or ("TextArea_" .. order)
+                local lines = math.clamp(tonumber(c.Lines) or 4, 2, 20)
+                local boxH = math.max(50, lines * 16)
+                local totalH = boxH + (c.Name and 24 or 8)
+
+                local F = Instance.new("Frame")
+                F.Size = UDim2.new(1, 0, 0, totalH); F.BorderSizePixel = 0; F.LayoutOrder = order
+                Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent; Corner(F, 3); Stroke(F, "Stroke", 1)
+
+                local yOff = 4
+                if c.Name then
+                    local L = Label(F, c.Name, 11, "Text", FONT)
+                    L.Position = UDim2.fromOffset(8, 4); L.Size = UDim2.new(1, -16, 0, 16)
+                    yOff = 22
+                end
+
+                local Box = Instance.new("TextBox")
+                Box.Position = UDim2.fromOffset(6, yOff); Box.Size = UDim2.new(1, -12, 0, boxH)
+                Box.Text = c.Default or ""; Box.TextSize = 10; Box.Font = FONT
+                Box.PlaceholderText = c.Placeholder or "Type here..."; Box.ClearTextOnFocus = false
+                Box.TextYAlignment = Enum.TextYAlignment.Top; Box.TextXAlignment = Enum.TextXAlignment.Left
+                Box.MultiLine = true; Box.TextWrapped = true
+                Th(Box, "BackgroundColor3", "Sidebar"); Th(Box, "TextColor3", "Text"); Th(Box, "PlaceholderColor3", "SubText")
+                Box.Parent = F; Corner(Box, 3); Stroke(Box, "Stroke", 1); Pad(Box, 6, 6, 6, 6)
+
+                Box.FocusLost:Connect(function(enterPressed)
+                    SetFlag(flag, Box.Text, c.NoSave)
+                    Safe(c.Callback, Box.Text, enterPressed)
+                end)
+
+                local ctrl = {
+                    Set = function(_, t)
+                        Box.Text = tostring(t)
+                        SetFlag(flag, Box.Text, c.NoSave)
+                    end,
+                    SetText = function(_, t)
+                        Box.Text = tostring(t)
+                        SetFlag(flag, Box.Text, c.NoSave)
+                    end,
+                    Get = function() return Box.Text end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end
+                }
+                Lib.Registry[flag] = function(v) ctrl:Set(v) end
+                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower(c.Name or "textarea") }
+                return ctrl
+            end
+
+            function targetObj:CreateImageButton(c)
+                c = c or {}
+                order = order + 1
+                local hasDesc = (c.Desc and c.Desc ~= "")
+                local h = 28
+                local effRightW = 24 + (hasDesc and 20 or 0)
+
+                local F = Instance.new("Frame")
+                F.Size = UDim2.new(1, 0, 0, h); F.BorderSizePixel = 0; F.LayoutOrder = order
+                Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent; Corner(F, 3); Stroke(F, "Stroke", 1)
+
+                local Img = Instance.new("ImageLabel")
+                Img.Position = UDim2.fromOffset(6, (h - 18) / 2); Img.Size = UDim2.fromOffset(18, 18)
+                Img.BackgroundTransparency = 1; Img.Image = c.Image or ""; Img.Parent = F; Corner(Img, 2)
+
+                local L = Label(F, c.Name or "Button", 11, "Text", FONT)
+                L.Position = UDim2.fromOffset(28, 0); L.Size = UDim2.new(1, -(28 + effRightW), 1, 0)
+
+                if hasDesc then
+                    local infoBtn = Instance.new("TextButton")
+                    infoBtn.AnchorPoint = Vector2.new(1, .5); infoBtn.Position = UDim2.new(1, -28, .5, 0)
+                    infoBtn.Size = UDim2.fromOffset(15, 15); infoBtn.Text = "?"; infoBtn.TextSize = 10; infoBtn.Font = FONTB
+                    infoBtn.AutoButtonColor = false; Th(infoBtn, "BackgroundColor3", "Sidebar"); Th(infoBtn, "TextColor3", "SubText")
+                    infoBtn.Parent = F; Corner(infoBtn, 8); Stroke(infoBtn, "Stroke", 1)
+                    infoBtn.Activated:Connect(function()
+                        Win:Notify({ Title = c.Name or "Information", Content = c.Desc, Type = "Info", Duration = 3 })
+                    end)
+                end
+
+                local Arr = Label(F, "›", 14, "SubText", FONTB, Enum.TextXAlignment.Center)
+                Arr.AnchorPoint = Vector2.new(1, .5); Arr.Position = UDim2.new(1, -6, .5, 0); Arr.Size = UDim2.fromOffset(14, 14)
+
+                local b = Instance.new("TextButton")
+                b.Size = UDim2.fromScale(1, 1); b.BackgroundTransparency = 1; b.Text = ""; b.Parent = F
+                b.Activated:Connect(function()
+                    Tw(F, { BackgroundColor3 = T.CardHover }, 0.08)
+                    task.delay(0.1, function() if F and F.Parent then Tw(F, { BackgroundColor3 = T.Card }, 0.15) end end)
+                    Safe(c.Callback)
+                end)
+
+                local ctrl = {
+                    Set = function(_, t) L.Text = tostring(t) end,
+                    SetText = function(_, t) L.Text = tostring(t) end,
+                    SetImage = function(_, id) Img.Image = tostring(id) end,
+                    Get = function() return L.Text end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end,
+                    Fire = function() Safe(c.Callback) end
+                }
+                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower((c.Name or "") .. " " .. (c.Desc or "")) }
+                return ctrl
+            end
+
+            function targetObj:CreateCustomFrame(c)
+                c = c or {}
+                order = order + 1
+                local h = tonumber(c.Height) or 100
+
+                local F = Instance.new("Frame")
+                F.Size = UDim2.new(1, 0, 0, h); F.BorderSizePixel = 0; F.LayoutOrder = order
+                Th(F, "BackgroundColor3", "Card"); F.Parent = targetParent; Corner(F, 3); Stroke(F, "Stroke", 1)
+                F.ClipsDescendants = true
+
+                return {
+                    Frame = F,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end
+                }
+            end
+
+            -- ==================== Standard Core Controls ====================
             function targetObj:CreateButton(c)
                 local F, L = Base(c, 24)
                 local b = Instance.new("TextButton")
@@ -704,13 +1339,19 @@ function Lib:CreateWindow(cfg)
 
                 b.Activated:Connect(function()
                     Tw(F, { BackgroundColor3 = T.CardHover }, 0.08)
-                    task.delay(0.1, function() Tw(F, { BackgroundColor3 = T.Card }, 0.15) end)
+                    task.delay(0.1, function() if F and F.Parent then Tw(F, { BackgroundColor3 = T.Card }, 0.15) end end)
                     Safe(c.Callback)
                 end)
-                return { Set = function(_, t) L.Text = t end, Fire = function() Safe(c.Callback) end }
+                return {
+                    Set = function(_, t) L.Text = tostring(t) end,
+                    SetText = function(_, t) L.Text = tostring(t) end,
+                    Get = function() return L.Text end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end,
+                    Fire = function() Safe(c.Callback) end
+                }
             end
 
-            -- CreateToggle
             function targetObj:CreateToggle(c)
                 local flag = c.Flag or c.Name or "Toggle"
                 local F = Base(c, 36)
@@ -733,30 +1374,42 @@ function Lib:CreateWindow(cfg)
                 b.Size = UDim2.fromScale(1, 1); b.BackgroundTransparency = 1; b.Text = ""; b.Parent = F
                 b.Activated:Connect(function()
                     state = not state
-                    PaintSw(true); SetFlag(flag, state)
+                    PaintSw(true); SetFlag(flag, state, c.NoSave)
                     Safe(c.Callback, state)
                 end)
                 local ctrl = {
                     Set = function(_, v, silent)
-                        state = v == true; PaintSw(true); SetFlag(flag, state)
+                        state = v == true; PaintSw(true); SetFlag(flag, state, c.NoSave)
                         if not silent then Safe(c.Callback, state) end
                     end,
-                    Get = function() return state end
+                    Get = function() return state end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end
                 }
                 Lib.Registry[flag] = function(v) ctrl:Set(v) end
                 return ctrl
             end
 
-            -- CreateSlider
             function targetObj:CreateSlider(c)
                 local flag = c.Flag or c.Name or "Slider"
                 local min, max = c.Min or 0, c.Max or 100
                 local inc = c.Increment or 1
+                local suffix = c.Suffix or ""
                 local val = math.clamp(c.Default or min, min, max)
-                local F = Base(c, 45)
+                local F = Base(c, 52)
 
-                local VL = Label(F, tostring(val) .. (c.Suffix or ""), 10, "Accent", FONTB, Enum.TextXAlignment.Right)
-                VL.AnchorPoint = Vector2.new(1, .5); VL.Position = UDim2.new(1, -6, .5, 0); VL.Size = UDim2.fromOffset(40, 16)
+                local function FormatVal(v)
+                    if inc >= 1 then
+                        return string.format("%d", math.floor(v + 0.5)) .. suffix
+                    else
+                        local s = tostring(inc)
+                        local dec = #s - (s:find("%.") or #s)
+                        return string.format("%." .. dec .. "f", v) .. suffix
+                    end
+                end
+
+                local VL = Label(F, FormatVal(val), 10, "Accent", FONTB, Enum.TextXAlignment.Right)
+                VL.AnchorPoint = Vector2.new(1, .5); VL.Position = UDim2.new(1, -6, .5, 0); VL.Size = UDim2.fromOffset(48, 16)
 
                 local Bar = Instance.new("Frame")
                 Bar.AnchorPoint = Vector2.new(0, 1); Bar.Position = UDim2.new(0, 8, 1, -3)
@@ -764,35 +1417,36 @@ function Lib:CreateWindow(cfg)
                 Th(Bar, "BackgroundColor3", "SwitchOff"); Bar.Parent = F; Corner(Bar, 2)
 
                 local Fill = Instance.new("Frame")
-                Fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0); Fill.BorderSizePixel = 0
+                Fill.Size = UDim2.new((val - min) / math.max(max - min, 0.0001), 0, 1, 0); Fill.BorderSizePixel = 0
                 Th(Fill, "BackgroundColor3", "Accent"); Fill.Parent = Bar; Corner(Fill, 2)
 
                 local function Update(pos)
                     local a = math.clamp((pos.X - Bar.AbsolutePosition.X) / Bar.AbsoluteSize.X, 0, 1)
-                    local n = min + math.floor((min + (max - min) * a - min) / inc + .5) * inc
+                    local n = min + math.floor(((max - min) * a) / inc + .5) * inc
                     val = math.clamp(n, min, max)
-                    VL.Text = tostring(val) .. (c.Suffix or "")
-                    Fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0)
-                    SetFlag(flag, val)
+                    VL.Text = FormatVal(val)
+                    Fill.Size = UDim2.new((val - min) / math.max(max - min, 0.0001), 0, 1, 0)
+                    SetFlag(flag, val, c.NoSave)
                     Safe(c.Callback, val)
                 end
 
                 PointerDrag(Bar, Page, Update)
                 local ctrl = {
                     Set = function(_, v, silent)
-                        val = math.clamp(v, min, max)
-                        Fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0)
-                        VL.Text = tostring(val) .. (c.Suffix or "")
-                        SetFlag(flag, val)
+                        val = math.clamp(tonumber(v) or min, min, max)
+                        Fill.Size = UDim2.new((val - min) / math.max(max - min, 0.0001), 0, 1, 0)
+                        VL.Text = FormatVal(val)
+                        SetFlag(flag, val, c.NoSave)
                         if not silent then Safe(c.Callback, val) end
                     end,
-                    Get = function() return val end
+                    Get = function() return val end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end
                 }
                 Lib.Registry[flag] = function(v) ctrl:Set(v) end
                 return ctrl
             end
 
-            -- CreateInput
             function targetObj:CreateInput(c)
                 local flag = c.Flag or c.Name or "Input"
                 local inW = isCol and math.clamp(targetWidth * 0.45, 60, 95) or 105
@@ -807,26 +1461,35 @@ function Lib:CreateWindow(cfg)
                 box.FocusLost:Connect(function(enterPressed)
                     local t = box.Text
                     if c.NumbersOnly then t = tostring(tonumber(t) or "") box.Text = t end
-                    SetFlag(flag, t)
+                    SetFlag(flag, t, c.NoSave)
                     Safe(c.Callback, t, enterPressed)
                 end)
                 local ctrl = {
-                    Set = function(_, t) box.Text = tostring(t); SetFlag(flag, box.Text) end,
-                    Get = function() return box.Text end
+                    Set = function(_, t) box.Text = tostring(t); SetFlag(flag, box.Text, c.NoSave) end,
+                    SetText = function(_, t) box.Text = tostring(t); SetFlag(flag, box.Text, c.NoSave) end,
+                    Get = function() return box.Text end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end
                 }
                 Lib.Registry[flag] = function(v) ctrl:Set(v) end
                 return ctrl
             end
 
-            -- CreateDropdown
             function targetObj:CreateDropdown(c)
                 order = order + 1
                 local flag = c.Flag or c.Name or "Dropdown"
                 local options = c.Options or {}
                 local multi = c.Multi == true
+                local searchable = c.Searchable == true
                 local selected, current = {}, nil
-                if multi then for _, v in ipairs(type(c.Default) == "table" and c.Default or {}) do selected[v] = true end
-                else current = c.Default or options[1] or "" end
+
+                if multi then
+                    for _, v in ipairs(type(c.Default) == "table" and c.Default or (c.Default and {c.Default} or {})) do
+                        selected[v] = true
+                    end
+                else
+                    current = c.Default or options[1] or ""
+                end
 
                 local F = Instance.new("Frame")
                 F.Size = UDim2.new(1, 0, 0, 28); F.BorderSizePixel = 0; F.LayoutOrder = order
@@ -836,68 +1499,132 @@ function Lib:CreateWindow(cfg)
                 Head.Size = UDim2.new(1, 0, 0, 28); Head.BackgroundTransparency = 1; Head.Text = ""; Head.Parent = F
 
                 local L = Label(Head, c.Name or "Dropdown", 11, "Text", FONT)
-                L.Position = UDim2.fromOffset(8, 0); L.Size = UDim2.new(.5, -8, 1, 0)
+                L.Position = UDim2.fromOffset(8, 0); L.Size = UDim2.new(.48, -8, 1, 0)
 
                 local Sel = Label(Head, "", 10, "Accent", FONTB, Enum.TextXAlignment.Right)
-                Sel.AnchorPoint = Vector2.new(1, .5); Sel.Position = UDim2.new(1, -22, .5, 0); Sel.Size = UDim2.new(.45, 0, 1, 0)
+                Sel.AnchorPoint = Vector2.new(1, .5); Sel.Position = UDim2.new(1, -22, .5, 0); Sel.Size = UDim2.new(.46, 0, 1, 0)
 
                 local Arr = Label(Head, "▼", 8, "SubText", FONT, Enum.TextXAlignment.Center)
                 Arr.AnchorPoint = Vector2.new(1, .5); Arr.Position = UDim2.new(1, -6, .5, 0); Arr.Size = UDim2.fromOffset(12, 12)
 
+                local contentY = 30
+                local filterText = ""
+                local SBox = nil
+
+                if searchable then
+                    SBox = Instance.new("TextBox")
+                    SBox.Position = UDim2.fromOffset(6, contentY); SBox.Size = UDim2.new(1, -12, 0, 20)
+                    SBox.PlaceholderText = "Search options..."; SBox.Text = ""; SBox.TextSize = 10; SBox.Font = FONT
+                    SBox.ClearTextOnFocus = false
+                    Th(SBox, "BackgroundColor3", "Sidebar"); Th(SBox, "TextColor3", "Text"); Th(SBox, "PlaceholderColor3", "SubText")
+                    SBox.Parent = F; Corner(SBox, 2); Stroke(SBox, "Stroke", 1); Pad(SBox, 4, 0, 4, 0)
+                    contentY = contentY + 24
+                end
+
+                local listH = 80
                 local DList = Instance.new("ScrollingFrame")
-                DList.Position = UDim2.fromOffset(6, 30); DList.Size = UDim2.new(1, -12, 0, 75)
+                DList.Position = UDim2.fromOffset(6, contentY)
+                DList.Size = UDim2.new(1, -12, 0, listH)
                 DList.BackgroundTransparency = 1; DList.BorderSizePixel = 0; DList.ScrollBarThickness = 2
                 DList.ScrollingDirection = Enum.ScrollingDirection.Y; DList.Parent = F
                 local DLL = Instance.new("UIListLayout"); DLL.Padding = UDim.new(0, 2); DLL.Parent = DList
 
                 local open = false
+                local openH = contentY + listH + 6
+
                 local function Val()
-                    if multi then local t = {}; for _, o in ipairs(options) do if selected[o] then t[#t+1] = o end end return t end
+                    if multi then
+                        local t = {}
+                        for _, o in ipairs(options) do if selected[o] then t[#t+1] = o end end
+                        return t
+                    end
                     return current
                 end
+
                 local function Display()
                     if multi then
-                        local t = {}; for _, o in ipairs(options) do if selected[o] then t[#t+1] = tostring(o) end end
+                        local t = Val()
                         Sel.Text = #t > 0 and table.concat(t, ", ") or "None"
-                    else Sel.Text = current ~= nil and tostring(current) or "None" end
+                    else
+                        Sel.Text = current ~= nil and tostring(current) or "None"
+                    end
                 end
 
-                local function Build()
+                local function RebuildOptions()
                     for _, ch in ipairs(DList:GetChildren()) do if ch:IsA("TextButton") then ch:Destroy() end end
                     for _, opt in ipairs(options) do
-                        local b = Instance.new("TextButton")
-                        b.Size = UDim2.new(1, 0, 0, 22); b.Text = tostring(opt); b.TextSize = 10; b.Font = FONT
-                        b.AutoButtonColor = false; Th(b, "BackgroundColor3", "Sidebar"); Th(b, "TextColor3", "SubText")
-                        b.Parent = DList; Corner(b, 2)
-                        b.Activated:Connect(function()
-                            if multi then selected[opt] = not selected[opt] or nil
-                            else current = opt; open = false; Arr.Text = "▼"; Tw(F, { Size = UDim2.new(1, 0, 0, 28) }, 0.15) end
-                            Display(); SetFlag(flag, Val()); Safe(c.Callback, Val())
-                        end)
+                        local optStr = tostring(opt)
+                        local match = (filterText == "") or (string.find(string.lower(optStr), filterText, 1, true) ~= nil)
+                        if match then
+                            local isSel = multi and (selected[opt] == true) or (current == opt)
+                            local b = Instance.new("TextButton")
+                            b.Size = UDim2.new(1, 0, 0, 22); b.Text = (multi and (isSel and "✓ " or "   ") or "") .. optStr
+                            b.TextSize = 10; b.Font = isSel and FONTB or FONT; b.AutoButtonColor = false
+                            b.TextXAlignment = Enum.TextXAlignment.Left
+                            Pad(b, 6, 0, 6, 0)
+                            Th(b, "BackgroundColor3", isSel and "CardHover" or "Sidebar")
+                            Th(b, "TextColor3", isSel and "Accent" or "SubText")
+                            b.Parent = DList; Corner(b, 2)
+
+                            b.Activated:Connect(function()
+                                if multi then
+                                    selected[opt] = not selected[opt] or nil
+                                else
+                                    current = opt
+                                    open = false
+                                    Arr.Text = "▼"
+                                    Tw(F, { Size = UDim2.new(1, 0, 0, 28) }, 0.15)
+                                end
+                                Display()
+                                RebuildOptions()
+                                SetFlag(flag, Val(), c.NoSave)
+                                Safe(c.Callback, Val())
+                            end)
+                        end
                     end
                     Display()
                 end
-                Build()
+
+                if SBox then
+                    SBox:GetPropertyChangedSignal("Text"):Connect(function()
+                        filterText = string.lower(SBox.Text):match("^%s*(.-)%s*$")
+                        RebuildOptions()
+                    end)
+                end
+
+                RebuildOptions()
+
                 Head.Activated:Connect(function()
                     open = not open
                     Arr.Text = open and "▲" or "▼"
-                    Tw(F, { Size = UDim2.new(1, 0, 0, open and 110 or 28) }, 0.2)
+                    Tw(F, { Size = UDim2.new(1, 0, 0, open and openH or 28) }, 0.2)
                 end)
 
                 local ctrl = {
                     Set = function(_, v)
-                        if multi then selected = {}; for _, x in ipairs(type(v)=="table" and v or {v}) do selected[x]=true end
-                        else current = v end
-                        Display(); SetFlag(flag, Val())
+                        if multi then
+                            selected = {}
+                            for _, x in ipairs(type(v) == "table" and v or {v}) do selected[x] = true end
+                        else
+                            current = v
+                        end
+                        Display()
+                        RebuildOptions()
+                        SetFlag(flag, Val(), c.NoSave)
                     end,
-                    Refresh = function(_, opts) options = opts or {}; Build() end,
-                    Get = function() return Val() end
+                    Refresh = function(_, opts)
+                        options = opts or {}
+                        RebuildOptions()
+                    end,
+                    Get = function() return Val() end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end
                 }
                 Lib.Registry[flag] = function(v) ctrl:Set(v) end
+                Win.Elements[#Win.Elements + 1] = { Frame = F, Key = string.lower(c.Name or "dropdown") }
                 return ctrl
             end
 
-            -- [Restored]: CreateKeybind (Toggle/Hold + Mobile Quick-Trigger)
             function targetObj:CreateKeybind(c)
                 local flag = c.Flag or c.Name or "Keybind"
                 local def = c.Default or "E"
@@ -927,7 +1654,7 @@ function Lib:CreateWindow(cfg)
                 MB.Activated:Connect(function()
                     mode = mode == "Toggle" and "Hold" or "Toggle"
                     MB.Text = mode == "Toggle" and "TG" or "HD"
-                    SetFlag(flag, { Key = key, Mode = mode })
+                    SetFlag(flag, { Key = key, Mode = mode }, c.NoSave)
                 end)
 
                 KB.Activated:Connect(function()
@@ -940,7 +1667,7 @@ function Lib:CreateWindow(cfg)
                         isListening = false
                         key = (i.KeyCode ~= Enum.KeyCode.Escape) and i.KeyCode.Name or "None"
                         KB.Text = key
-                        SetFlag(flag, { Key = key, Mode = mode })
+                        SetFlag(flag, { Key = key, Mode = mode }, c.NoSave)
                         return
                     end
                     if gpe or key == "None" or i.KeyCode.Name ~= key then return end
@@ -960,15 +1687,16 @@ function Lib:CreateWindow(cfg)
                 local ctrl = {
                     Set = function(_, d)
                         if type(d) == "table" then key = d.Key or key; mode = d.Mode or mode else key = tostring(d) end
-                        KB.Text = key; MB.Text = mode == "Toggle" and "TG" or "HD"; SetFlag(flag, { Key = key, Mode = mode })
+                        KB.Text = key; MB.Text = mode == "Toggle" and "TG" or "HD"; SetFlag(flag, { Key = key, Mode = mode }, c.NoSave)
                     end,
-                    Get = function() return key, mode end
+                    Get = function() return key, mode end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end
                 }
                 Lib.Registry[flag] = function(v) ctrl:Set(v) end
                 return ctrl
             end
 
-            -- [Restored]: CreateColorPicker (HSV with compact UI)
             function targetObj:CreateColorPicker(c)
                 order = order + 1
                 local flag = c.Flag or c.Name or "ColorPicker"
@@ -994,7 +1722,6 @@ function Lib:CreateWindow(cfg)
                 Prev.Size = UDim2.fromOffset(22, 16); Prev.BorderSizePixel = 0
                 Prev.BackgroundColor3 = col; Prev.Parent = Head; Corner(Prev, 2); Stroke(Prev, "Stroke", 1)
 
-                -- SV Box
                 local SV = Instance.new("Frame")
                 SV.Position = UDim2.fromOffset(8, 32); SV.Size = UDim2.new(1, -16, 0, 70)
                 SV.BorderSizePixel = 0; SV.ClipsDescendants = true; SV.Parent = F; Corner(SV, 2)
@@ -1010,7 +1737,6 @@ function Lib:CreateWindow(cfg)
                 local Pin = Instance.new("Frame"); Pin.AnchorPoint = Vector2.new(.5, .5); Pin.Size = UDim2.fromOffset(8, 8)
                 Pin.BackgroundTransparency = 1; Pin.Parent = SV; Corner(Pin, 4); Stroke(Pin, "Text", 1.5)
 
-                -- Hue Bar
                 local HB = Instance.new("Frame")
                 HB.Position = UDim2.fromOffset(8, 108); HB.Size = UDim2.new(1, -16, 0, 10)
                 HB.BorderSizePixel = 0; HB.BackgroundColor3 = Color3.new(1, 1, 1); HB.Parent = F; Corner(HB, 2)
@@ -1040,12 +1766,12 @@ function Lib:CreateWindow(cfg)
                 PointerDrag(SV, Page, function(p)
                     s = math.clamp((p.X - SV.AbsolutePosition.X) / SV.AbsoluteSize.X, 0, 1)
                     v = 1 - math.clamp((p.Y - SV.AbsolutePosition.Y) / SV.AbsoluteSize.Y, 0, 1)
-                    Redraw(); SetFlag(flag, col); Safe(c.Callback, col)
+                    Redraw(); SetFlag(flag, col, c.NoSave); Safe(c.Callback, col)
                 end)
 
                 PointerDrag(HB, Page, function(p)
                     h = math.clamp((p.X - HB.AbsolutePosition.X) / HB.AbsoluteSize.X, 0, 1)
-                    Redraw(); SetFlag(flag, col); Safe(c.Callback, col)
+                    Redraw(); SetFlag(flag, col, c.NoSave); Safe(c.Callback, col)
                 end)
 
                 Head.Activated:Connect(function()
@@ -1055,15 +1781,16 @@ function Lib:CreateWindow(cfg)
 
                 local ctrl = {
                     Set = function(_, clr)
-                        if typeof(clr) == "Color3" then h, s, v = clr:ToHSV() Redraw(); SetFlag(flag, col) end
+                        if typeof(clr) == "Color3" then h, s, v = clr:ToHSV() Redraw(); SetFlag(flag, col, c.NoSave) end
                     end,
-                    Get = function() return col end
+                    Get = function() return col end,
+                    SetVisible = function(_, v) F.Visible = v end,
+                    Destroy = function(_) if F and F.Parent then F:Destroy() end end
                 }
                 Lib.Registry[flag] = function(v) ctrl:Set(v) end
                 return ctrl
             end
 
-            -- [Restored]: CreateConfigSection
             function targetObj:CreateConfigSection()
                 targetObj:CreateSection("Settings & Configs")
                 local slot = "Slot1"
@@ -1085,7 +1812,7 @@ function Lib:CreateWindow(cfg)
 
         BuildControls(Page, PAGE_W, Tab, false)
 
-        -- Multi-Column Layout
+        -- Multi-Column Layout (supports Cols.Col1 and Cols[1])
         function Tab:CreateColumnLayout(cols)
             cols = math.max(1, tonumber(cols) or 2)
             local Container = Instance.new("Frame")
@@ -1104,32 +1831,29 @@ function Lib:CreateWindow(cfg)
                 local ColObj = {}
                 BuildControls(ColF, singleW, ColObj, true)
                 ColList[i] = ColObj
+                ColList["Col" .. i] = ColObj
             end
-            return unpack(ColList)
+            return ColList
         end
 
         Win.Tabs[#Win.Tabs + 1] = Tab
         return Tab
     end
 
-    -- ==================== Real Stepped Loader: 30% (0.5s) | 30% (0.4s) | 40% (0.6s) ====================
+    -- ==================== Stepped Loader: 30% (0.5s) | 30% (0.4s) | 40% (0.6s) ====================
     task.spawn(function()
-        -- المرحلة 1: 30% بـ 0.5 ثانية
         StageLabel.Text = 'Loading "Core Engine"'
         Tw(ProgressFill, { Size = UDim2.fromScale(0.30, 1) }, 0.5, Enum.EasingStyle.Linear)
         task.wait(0.5)
 
-        -- المرحلة 2: 30% بـ 0.4 ثانية (المجموع 60%)
         StageLabel.Text = 'Loading "Tabs & Layouts"'
         Tw(ProgressFill, { Size = UDim2.fromScale(0.60, 1) }, 0.4, Enum.EasingStyle.Linear)
         task.wait(0.4)
 
-        -- المرحلة 3: 40% بـ 0.6 ثانية (المجموع 100%)
         StageLabel.Text = 'Loading "Button\'s & Controls"'
         Tw(ProgressFill, { Size = UDim2.fromScale(1.00, 1) }, 0.6, Enum.EasingStyle.Linear)
         task.wait(0.6)
 
-        -- إنهاء التحميل والتلاشي
         dotsRunning = false
         StageLabel.Text = 'Ready ""'
 
